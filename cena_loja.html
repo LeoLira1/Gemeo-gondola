@@ -62,10 +62,10 @@
   </div>
   <div id="info" class="panel"></div>
   <div id="legend" class="panel">
-    <span><i style="background:#f4f2ed"></i>Gôndola</span>
-    <span><i style="background:#dbe6f1"></i>Estante / expositor</span>
-    <span><i style="background:#9a7a62"></i>Balcão</span>
-    <span><i style="background:#2e9e4f"></i>Produto buscado</span>
+    <span><i style="background:#4caf50"></i>Gôndola</span>
+    <span><i style="background:#4a93d8"></i>Estante / expositor</span>
+    <span><i style="background:#1f9350"></i><i style="background:#8a6a52;margin-left:-4px"></i>Balcão</span>
+    <span><i style="background:rgba(46,158,79,.55);border-color:#2e9e4f"></i>Produto buscado (marca no chão)</span>
     <span><i style="background:transparent;border:2px solid #e87722"></i>Selecionada</span>
   </div>
   <div id="stats" class="panel"></div>
@@ -79,7 +79,8 @@
 const D = /*__DADOS__*/null;
 
 const ORANGE = 0xe87722, GREEN = 0x2e9e4f;
-const C_GOND = 0xf4f2ed, C_EST = 0xdbe6f1, C_BALCAO = 0xe3e8dc, C_TAMPO = 0x9a7a62, C_PAREDE = 0xd2cdc2;
+// Cores reais do Gondolas: gôndola verde, estante azul, balcão verde-escuro com tampo de mármore marrom.
+const C_GOND = 0x4caf50, C_EST = 0x4a93d8, C_BALCAO = 0x1f9350, C_TAMPO = 0x8a6a52, C_PAREDE = 0xd2cdc2, C_FADE = 0xe9e6df;
 const state = { sel: null, matched: new Set(), bonecos: 1 };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 const $ = (id) => document.getElementById(id);
@@ -259,7 +260,10 @@ for (const it of D.itens) {
   }
   const lab = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTex(it.rot, "n"), transparent: true, depthTest: false }));
   lab.renderOrder = 10; lab.userData.base = 1; lab.position.set(it.x, S.h + 0.38, it.z); scene.add(lab); labels.push(lab);
-  estruturas.push({ it, S, hit, label: lab, base, matched: false });
+  const hw2 = (it.kind === "gondola" ? D.gondola.r * 2 : it.w) + 0.4, hd2 = (it.kind === "gondola" ? D.gondola.r * 2 : it.d) + 0.4;
+  const halo = new THREE.Mesh(new THREE.PlaneGeometry(hw2, hd2), new THREE.MeshBasicMaterial({ color: GREEN, transparent: true, opacity: 0.55, depthWrite: false }));
+  halo.rotation.x = -Math.PI / 2; halo.position.set(it.x, 0.012, it.z); halo.visible = false; halo.renderOrder = 1; scene.add(halo);
+  estruturas.push({ it, S, hit, label: lab, base, matched: false, halo });
 }
 const hits = estruturas.filter((e) => e.hit).map((e) => e.hit);
 
@@ -286,17 +290,22 @@ const hoverBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeo
 hoverBox.visible = false; scene.add(hoverBox);
 
 // ── Cores (busca de produto) ────────────────────────────────────────────────
-function corPapel(role, base, destaque) {
-  const b = destaque ? GREEN : base;
-  if (role === "poste") return lerpHex(b, 0x000000, 0.45);
+// Com busca ativa, as estruturas SEM o produto esmaecem; as que o têm mantêm a cor real
+// (gôndola verde, estante azul) e ganham a marca verde no chão e o rótulo verde.
+function corPapel(role, base, esmaecida) {
+  const b = esmaecida ? lerpHex(base, C_FADE, 0.82) : base;
+  if (role === "poste") return lerpHex(b, 0x000000, esmaecida ? 0.2 : 0.45);
   if (role === "test") return lerpHex(b, 0xffffff, 0.35);
-  if (role === "tampo") return destaque ? lerpHex(GREEN, 0xffffff, 0.2) : C_TAMPO;
+  if (role === "tampo") return esmaecida ? lerpHex(C_TAMPO, C_FADE, 0.75) : C_TAMPO;
   return b;
 }
 function pintar() {
+  const busca = state.matched.size > 0;
   for (const e of estruturas) {
-    e.matched = state.matched.size > 0 && e.it.prod.some((p) => state.matched.has(normCod(p.c)));
-    for (const p of e.S.parts) p.m.material = getMat(corPapel(p.role, e.base, e.matched));
+    e.matched = busca && e.it.prod.some((p) => state.matched.has(normCod(p.c)));
+    const esmaecida = busca && !e.matched;
+    for (const p of e.S.parts) p.m.material = getMat(corPapel(p.role, e.base, esmaecida));
+    e.halo.visible = e.matched;
     const estilo = state.sel === e.it.rot && e.it.kind !== "balcao" ? "s" : e.matched ? "h" : "n";
     e.label.material.map = makeLabelTex(e.it.rot, estilo); e.label.material.needsUpdate = true;
   }
