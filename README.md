@@ -1,11 +1,16 @@
-# Galpão CAMDA — mapa 3D (Streamlit)
+# Galpão e loja CAMDA — mapas 3D (Streamlit)
 
-Cópia web, **somente leitura**, do mapa 3D do galpão do app Flutter
+Cópia web, **somente leitura**, dos mapas 3D do galpão e da loja do app Flutter
 [LeoLira1/Gondolas](https://github.com/LeoLira1/Gondolas). Planta, numeração
 (129 posições, 12 ruas, Parte 1 = 1–85, Parte 2 = 86–129 em serpentina) e regras
 de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 `lib/codigos_vinculados.dart`. Se a planta mudar lá, atualize `galpao.py`.
 
+- **Galpão:** 129 posições, pilhas de racks, cor por saldo (vermelho/azul), busca por número e produto.
+- **Loja (gôndolas e estantes):** planta de 10 × 14 m com as 12 gôndolas, estantes de parede, EDR-300,
+  expositores MagnoJet/Nellore/Monitor, Estante Parede, balcão e os bonecos que caminham pelos corredores.
+  Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
+  Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.
 - Quantidades em **unidades**, sem conversão.
@@ -34,5 +39,7 @@ Testes da lógica (opcional): `pip install pytest && pytest tests`.
 |---|---|
 | `app.py` | Página Streamlit, cache, injeção do JSON na cena |
 | `dados.py` | Cliente Turso (HTTP, só leitura), montagem do JSON, dados de exemplo |
-| `galpao.py` | Planta e regras de saldo/códigos vinculados (porte do Gondolas) |
-| `cena.html` | Cena Three.js (clay, OrbitControls, buscas, tooltip) |
+| `galpao.py` | Planta e regras de saldo/códigos vinculados do galpão (porte do Gondolas) |
+| `loja.py` | Planta da loja e produtos por estrutura (porte do Gondolas) |
+| `cena.html` | Cena Three.js do galpão |
+| `cena_loja.html` | Cena Three.js da loja |

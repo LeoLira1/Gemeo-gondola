@@ -94,3 +94,60 @@ def test_exemplo_tem_todos_os_estados():
     assert tipos == {"falta", "sobra"}
     assert any(len(p) == 4 for p in d["pilhas"].values())
     assert len(d["pilhas"]) < 129
+
+
+# ── Loja ────────────────────────────────────────────────────────────────────
+import loja as lj
+
+
+def test_planta_da_loja():
+    gond = [i for i in lj.ITENS if i["tipo"] == "gondola"]
+    assert sorted(i["n"] for i in gond) == list(range(1, 13))
+    assert {i["n"] for i in lj.ITENS if i["tipo"] == "estante"} == {1, 2, 6, 7, 8, 9, 13, 19, 20, 21}
+    # tudo dentro das paredes
+    tol = 0.01   # a Estante Parede do Gondolas entra 5 mm na parede (x = 0,45, w = 0,55)
+    for i in lj.ITENS:
+        assert lj.PAREDE_ESP - tol <= i["x"] - i["w"] / 2 and i["x"] + i["w"] / 2 <= lj.LOJA_W - lj.PAREDE_ESP + tol
+        assert lj.PAREDE_ESP - tol <= i["z"] - i["d"] / 2 and i["z"] + i["d"] / 2 <= lj.LOJA_H - lj.PAREDE_ESP + tol
+    # o balcão encosta na parede da entrada (z = 14 - 0,18)
+    bal = next(i for i in lj.ITENS if i["kind"] == "balcao")
+    assert abs(bal["z"] + bal["d"] / 2 - (lj.LOJA_H - lj.PAREDE_ESP)) < 1e-9
+    assert lj.numero_no_mapa("estante", 16) == 13 and lj.numero_no_mapa("gondola", 16) == 16
+    assert abs(lj.ALTURA_GONDOLA - 0.6492) < 1e-3
+
+
+def test_face_da_gondola():
+    # centro da face k = 90° − (k−1)·60° (face 1 voltada para +Z, numeração horária vista de cima)
+    for k in range(1, 7):
+        ang = math.radians(90 - 60 * (k - 1))
+        assert lj.face_from_pos(math.cos(ang), math.sin(ang)) == k
+
+
+def test_montar_loja_agrupa_e_ignora():
+    gond = [
+        {"produto_codigo": "A", "produto_nome": "PROD A", "gondola_num": 7, "andar": 0, "pos_x": 0, "pos_z": 1},
+        {"produto_codigo": "A", "produto_nome": "PROD A", "gondola_num": 7, "andar": 0, "pos_x": 0, "pos_z": 1},  # duplicada
+    ]
+    est = [
+        {"produto_codigo": "A", "produto_nome": "PROD A", "estante_num": 15, "nivel": 9},     # parede, nível limitado
+        {"produto_codigo": "R", "produto_nome": "REMOVIDA", "estante_num": 3, "nivel": 1},    # estante removida
+        {"produto_codigo": "N", "produto_nome": "NELLORE BASE", "estante_num": 19, "nivel": 0},  # base que saiu
+    ]
+    qtd = [
+        {"produto_codigo": "A", "local_tipo": "gondola", "local_num": 7, "face_ou_coluna": 1, "andar_ou_nivel": 0, "quantidade": 30},
+        {"produto_codigo": "A", "local_tipo": "estante", "local_num": 15, "face_ou_coluna": 0, "andar_ou_nivel": 5, "quantidade": 8},
+        {"produto_codigo": "A", "local_tipo": "galpao", "local_num": 7, "face_ou_coluna": 0, "andar_ou_nivel": 1, "quantidade": 999},
+    ]
+    out = lj.montar(gond, est, qtd)
+    g7 = next(i for i in out["itens"] if i["tipo"] == "gondola" and i["n"] == 7)
+    assert len(g7["prod"]) == 1 and g7["prod"][0]["q"] == 30 and g7["prod"][0]["loc"] == "Face 1 · Base"
+    parede = next(i for i in out["itens"] if i["kind"] == "parede")
+    assert parede["prod"][0]["q"] == 8 and parede["prod"][0]["loc"] == "Seção 15 · Nível 6"
+    assert [c["c"] for c in out["catalogo"]] == ["A"]          # removida e base do Nellore ficam de fora
+    assert all(not i["prod"] for i in out["itens"] if i["kind"] in ("nellore",))
+
+
+def test_exemplo_da_loja():
+    import dados as dd2
+    d = dd2.loja_exemplo()
+    assert len(d["itens"]) == 22 and any(i["prod"] for i in d["itens"])

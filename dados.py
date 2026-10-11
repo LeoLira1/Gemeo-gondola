@@ -6,12 +6,14 @@ prontos e nada mais.
 
 from __future__ import annotations
 
+import math
 import random
 from typing import Any
 
 import requests
 
 import galpao as g
+import loja as lj
 
 TIMEOUT_S = 20
 
@@ -276,5 +278,59 @@ def dados_exemplo() -> dict[str, Any]:
         mestre.append({"codigo": cod, "produto": nome, "qtd_sistema": round(end * fator)})
     enderecado = [{"produto_codigo": c, "enderecado": q} for c, q in totais.items()]
     dados = montar(racks, mestre, {}, enderecado)
+    dados["avisos"] = []
+    return dados
+
+
+# ── Loja (gôndolas e estantes) ──────────────────────────────────────────────
+
+SQL_GONDOLAS = (
+    "SELECT DISTINCT produto_codigo, produto_nome, gondola_num, andar, pos_x, pos_z "
+    "FROM gondola_layout ORDER BY produto_nome"
+)
+SQL_ESTANTES = (
+    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel FROM estante_layout "
+    f"WHERE estante_num NOT IN ({', '.join(map(str, lj.ESTANTES_REMOVIDAS))}) "
+    f"AND NOT (estante_num = {lj.NELLORE} AND nivel = 0) ORDER BY produto_nome"
+)
+SQL_QTD_LOJA = (
+    "SELECT produto_codigo, local_tipo, local_num, face_ou_coluna, andar_ou_nivel, quantidade "
+    "FROM estoque_localizado WHERE local_tipo IN ('gondola', 'estante')"
+)
+
+
+def ler_loja(url: str, token: str) -> dict[str, Any]:
+    gond, est, qtd = consultar(url, token, [SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA])
+    if gond is None or est is None:
+        raise TursoErro("não consegui ler gondola_layout / estante_layout")
+    dados = lj.montar(gond, est, qtd or [])
+    dados["avisos"] = [] if qtd is not None else ["estoque_localizado não pôde ser lida; as quantidades não aparecem."]
+    return dados
+
+
+def loja_exemplo() -> dict[str, Any]:
+    """Loja fictícia, determinística, só para ver o mapa sem o banco."""
+    rnd = random.Random(21)
+    gond, est, qtd = [], [], []
+    for it in lj.ITENS:
+        if it["kind"] == "balcao":
+            continue
+        for _ in range(rnd.randint(3, 9)):
+            cod, nome = rnd.choice(_PRODUTOS_DEMO)
+            q = rnd.choice([6, 10, 12, 20, 24, 36])
+            if it["tipo"] == "gondola":
+                face, andar = rnd.randint(1, 6), rnd.randint(0, 2)
+                ang = math.radians(90 - 60 * (face - 1))
+                gond.append({"produto_codigo": cod, "produto_nome": nome, "gondola_num": it["n"],
+                             "andar": andar, "pos_x": math.cos(ang), "pos_z": math.sin(ang)})
+                qtd.append({"produto_codigo": cod, "local_tipo": "gondola", "local_num": it["n"],
+                            "face_ou_coluna": face, "andar_ou_nivel": andar, "quantidade": q})
+            else:
+                nivel = rnd.randint(0, lj.niveis_produto(it["n"]) - 1)
+                num = it["n"] + (rnd.randint(0, 5) if it["kind"] == "parede" else 0)
+                est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel})
+                qtd.append({"produto_codigo": cod, "local_tipo": "estante", "local_num": num,
+                            "face_ou_coluna": 0, "andar_ou_nivel": nivel, "quantidade": q})
+    dados = lj.montar(gond, est, qtd)
     dados["avisos"] = []
     return dados
