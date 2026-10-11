@@ -11,6 +11,10 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   expositores MagnoJet/Nellore/Monitor, Estante Parede, balcão e os bonecos que caminham pelos corredores.
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
   Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
+- **Planta geral:** a planta baixa do croqui num mapa só: loja, corredor da loja (com o portão), corredor de
+  carregamento, Galpão Parte 1 e Parte 2 e o **barracão** (35 × 10 m, ao norte do Galpão Parte 1, com paletes e bags
+  de `barracao_enderecos`). Botões levam a cada prédio; as buscas (`G7`, `E5`, `100`, `BAR7`, produto) valem para tudo.
+  O croqui não tem escala: os galpões são dimensionados pelos racks e as folgas estão em `planta.py`.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.
 - Quantidades em **unidades**, sem conversão.
@@ -43,3 +47,5 @@ Testes da lógica (opcional): `pip install pytest && pytest tests`.
 | `loja.py` | Planta da loja e produtos por estrutura (porte do Gondolas) |
 | `cena.html` | Cena Three.js do galpão |
 | `cena_loja.html` | Cena Three.js da loja |
+| `planta.py` | Onde cada prédio fica na planta geral e o barracão (porte do Gondolas) |
+| `cena_geral.html` | Cena Three.js da planta geral |

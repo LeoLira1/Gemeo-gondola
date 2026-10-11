@@ -151,3 +151,50 @@ def test_exemplo_da_loja():
     import dados as dd2
     d = dd2.loja_exemplo()
     assert len(d["itens"]) == 22 and any(i["prod"] for i in d["itens"])
+
+
+# ── Planta geral e barracão ─────────────────────────────────────────────────
+import planta as pl
+
+
+def test_barracao_padrao_100_paletes():
+    pal = pl.b_posicoes_padrao()
+    assert len(pal) == 100 and pal[0]["rot"] == "BAR-01" and pal[-1]["rot"] == "BAR-100"
+    assert pl.b_colunas() == 25
+    # fileiras (cm): fundo → frente
+    assert [pl.b_z_da_fileira(i) for i in range(4)] == [930, 810, 310, 190]
+    # tudo cabe entre as paredes (interior de 20 a 3480 em X, 20 a 980 em Z)
+    for p in pal:
+        assert 20 <= p["x"] - pl.PALETE_X / 2 and p["x"] + pl.PALETE_X / 2 <= 3480
+        assert 20 <= p["z"] - pl.PALETE_Z / 2 and p["z"] + pl.PALETE_Z / 2 <= 980
+    # corredor central de manobra: 400 cm entre as faces internas dos dois blocos
+    assert (pl.b_z_da_fileira(1) - pl.PALETE_Z / 2) - (pl.b_z_da_fileira(2) + pl.PALETE_Z / 2) == 400
+
+
+def test_disposicao_segue_o_croqui():
+    d = pl.disposicao()
+    p = d["predios"]
+    # galpão 1 logo acima da loja, galpão 2 à esquerda do corredor, barracão ao norte do galpão 1
+    assert p["galpao1"]["z1"] == p["loja"]["z0"] == 0 and p["galpao1"]["x0"] == p["loja"]["x0"]
+    assert p["galpao2"]["x1"] == -pl.LARGURA_CORREDOR and p["galpao2"]["z1"] == 0
+    assert p["barracao"]["z1"] < p["galpao1"]["z0"]
+    assert abs((p["barracao"]["x1"] - p["barracao"]["x0"]) - 35) < 1e-9
+    assert abs((p["barracao"]["z1"] - p["barracao"]["z0"]) - 10) < 1e-9
+    # os racks de cada parte cabem dentro do prédio
+    for parte, k in ((1, "galpao1"), (2, "galpao2")):
+        dx, dz = d["off"][str(parte)]
+        mnx, mxx, mnz, mxz = g.limites_da_parte(parte)
+        assert p[k]["x0"] < mnx + dx and mxx + dx < p[k]["x1"] and p[k]["z0"] < mnz + dz and mxz + dz < p[k]["z1"]
+
+
+def test_montar_barracao_do_banco_e_sem_banco():
+    b = pl.montar_barracao([{"id": 7, "rotulo": "BAR-07", "pos_x": 250, "pos_z": 930, "produto_codigo": "A", "produto_nome": "PROD", "quantidade": 2}])
+    assert not b["padrao"] and b["pal"][0]["x"] == 2.5 and b["pal"][0]["c"] == "A"
+    assert pl.montar_barracao([])["padrao"] and len(pl.montar_barracao(None)["pal"]) == 100
+
+
+def test_geral_exemplo_junta_tudo():
+    import dados as dd3
+    d = dd3.geral_exemplo()
+    assert {"loja", "galpao", "barracao", "predios", "corredores", "portao", "catalogo"} <= set(d)
+    assert len(d["galpao"]["posicoes"]) == 129 and len(d["loja"]["itens"]) == 22

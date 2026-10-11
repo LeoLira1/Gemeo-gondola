@@ -17,7 +17,8 @@ import streamlit.components.v1 as components
 import dados as dd
 
 ALTURA_MAPA = 700
-CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html")}
+CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html"),
+         "geral": Path(__file__).with_name("cena_geral.html")}
 
 st.set_page_config(page_title="Galpão CAMDA", page_icon="📦", layout="wide")
 st.markdown(
@@ -37,13 +38,13 @@ def _segredo(nome: str) -> str | None:
 @st.cache_data(ttl=60, show_spinner="Lendo o Turso…")
 def ler_banco(url: str, token: str, mapa: str) -> tuple[dict, str]:
     """Lê o mapa pedido. Só é cacheado quando dá certo (exceção não entra no cache)."""
-    ler = dd.ler_turso if mapa == "galpao" else dd.ler_loja
+    ler = {"galpao": dd.ler_turso, "loja": dd.ler_loja, "geral": dd.ler_geral}[mapa]
     return ler(url, token), datetime.now().strftime("%H:%M:%S")
 
 
 def carregar(mapa: str) -> tuple[dict, str | None, str | None]:
     """(dados, hora da leitura, motivo do fallback). Motivo != None → dados de exemplo."""
-    exemplo = dd.dados_exemplo if mapa == "galpao" else dd.loja_exemplo
+    exemplo = {"galpao": dd.dados_exemplo, "loja": dd.loja_exemplo, "geral": dd.geral_exemplo}[mapa]
     url, token = _segredo("TURSO_URL"), _segredo("TURSO_TOKEN")
     if not url or not token:
         return exemplo(), None, "TURSO_URL / TURSO_TOKEN não configurados em st.secrets"
@@ -68,12 +69,10 @@ def cena_html(dados: dict, mapa: str) -> str:
 
 
 # ── Página ──────────────────────────────────────────────────────────────────
-c_titulo, c_mapa, c_btn = st.columns([2, 3, 1], vertical_alignment="center")
-c_titulo.subheader("Galpão e loja CAMDA")
-mapa_nome = c_mapa.radio(
-    "Mapa", ["Galpão", "Loja (gôndolas e estantes)"], horizontal=True, label_visibility="collapsed"
-)
-mapa = "galpao" if mapa_nome == "Galpão" else "loja"
+c_titulo, c_mapa, c_btn = st.columns([2, 4, 1], vertical_alignment="center")
+c_titulo.subheader("CAMDA — mapas 3D")
+MAPAS = {"Galpão": "galpao", "Loja (gôndolas e estantes)": "loja", "Planta geral": "geral"}
+mapa = MAPAS[c_mapa.radio("Mapa", list(MAPAS), horizontal=True, label_visibility="collapsed")]
 dados, hora, motivo = carregar(mapa)
 
 with c_btn:
@@ -91,6 +90,14 @@ if mapa == "galpao":
     resumo = (
         f"{ocupadas} de {total} posições com carga · {total - ocupadas} livres · {racks} racks · "
         f"{falta} produtos com carga sem endereço · {sobra} endereçados além do sistema"
+    )
+elif mapa == "geral":
+    g_, l_, b_ = dados["galpao"], dados["loja"], dados["barracao"]
+    resumo = (
+        f"Loja: {len([i for i in l_['itens'] if i['kind'] != 'balcao'])} estruturas · "
+        f"Galpão: {len(g_['pilhas'])} de {len(g_['posicoes'])} posições com carga · "
+        f"Barracão: {sum(1 for p in b_['pal'] if p['c'].strip())} de {len(b_['pal'])} paletes com bag · "
+        f"{len(dados['catalogo'])} produtos"
     )
 else:
     itens = [i for i in dados["itens"] if i["kind"] != "balcao"]

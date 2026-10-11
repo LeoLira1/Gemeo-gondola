@@ -233,3 +233,14 @@ def montar_saldos(
         enderecado = sum(enderecado_por_codigo.get(c, 0.0) for c in grupo)
         saldos[bruto] = Saldo(bruto, sistema, enderecado, tuple(grupo))
     return saldos
+
+
+def limites_da_parte(parte: int) -> tuple[float, float, float, float]:
+    """(minX, maxX, minZ, maxZ) das posições de uma parte, com a meia-medida do rack."""
+    lista = [p for p in POSICOES if p.parte == parte] or list(POSICOES)
+    return (
+        min(p.x - p.tamanho_x / 2 for p in lista),
+        max(p.x + p.tamanho_x / 2 for p in lista),
+        min(p.z - p.tamanho_z / 2 for p in lista),
+        max(p.z + p.tamanho_z / 2 for p in lista),
+    )

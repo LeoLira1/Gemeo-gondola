@@ -14,6 +14,7 @@ import requests
 
 import galpao as g
 import loja as lj
+import planta as pl
 
 TIMEOUT_S = 20
 
@@ -191,10 +192,7 @@ def montar(
     }
 
 
-def ler_turso(url: str, token: str) -> dict[str, Any]:
-    racks, posicoes, mestre, mapa, mapa_cod, end = consultar(
-        url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO]
-    )
+def _montar_galpao_de(racks, posicoes, mestre, mapa, mapa_cod, end) -> dict[str, Any]:
     if racks is None or mestre is None or end is None:
         raise TursoErro("não consegui ler galpao_racks / estoque_mestre / estoque_localizado")
 
@@ -209,6 +207,12 @@ def ler_turso(url: str, token: str) -> dict[str, Any]:
     dados = montar(racks, mestre, vinculos, end)
     dados["avisos"] = _avisos_planta(posicoes)
     return dados
+
+
+def ler_turso(url: str, token: str) -> dict[str, Any]:
+    return _montar_galpao_de(
+        *consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO])
+    )
 
 
 def _avisos_planta(linhas: list[dict[str, Any]] | None) -> list[str]:
@@ -334,3 +338,56 @@ def loja_exemplo() -> dict[str, Any]:
     dados = lj.montar(gond, est, qtd)
     dados["avisos"] = []
     return dados
+
+
+# ── Planta geral (loja + galpão + barracão) ─────────────────────────────────
+
+SQL_BARRACAO = (
+    "SELECT id, rotulo, pos_x, pos_z, produto_codigo, produto_nome, quantidade "
+    "FROM barracao_enderecos ORDER BY id"
+)
+
+
+def _juntar_geral(galpao: dict[str, Any], loja: dict[str, Any], barracao_linhas) -> dict[str, Any]:
+    barr = pl.montar_barracao(barracao_linhas)
+    catalogo: dict[str, str] = {}
+    for fonte in (loja["catalogo"], galpao["catalogo"]):
+        for p in fonte:
+            catalogo.setdefault(p["c"], p["n"])
+    for p in barr["pal"]:
+        if p["c"].strip():
+            catalogo.setdefault(p["c"], p["n"])
+    avisos = list(galpao.get("avisos", [])) + list(loja.get("avisos", []))
+    if barr["padrao"]:
+        avisos.append("barracao_enderecos está vazia ou não pôde ser lida; o barracão mostra o layout padrão, com todos os paletes livres.")
+    return {
+        **pl.disposicao(),
+        "loja": loja,
+        "galpao": {k: galpao[k] for k in ("posicoes", "ruas", "geo", "pilhas", "divergencia")},
+        "barracao": barr,
+        "catalogo": [{"c": c, "n": n} for c, n in sorted(catalogo.items())],
+        "avisos": avisos,
+    }
+
+
+def ler_geral(url: str, token: str) -> dict[str, Any]:
+    """Planta geral: lê galpão, loja e barracão numa ida só ao Turso."""
+    res = consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO,
+                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO])
+    galpao = _montar_galpao_de(*res[:6])
+    gond, est, qtd, barr = res[6:]
+    if gond is None or est is None:
+        raise TursoErro("não consegui ler gondola_layout / estante_layout")
+    loja = lj.montar(gond, est, qtd or [])
+    loja["avisos"] = [] if qtd is not None else ["estoque_localizado não pôde ser lida; as quantidades da loja não aparecem."]
+    return _juntar_geral(galpao, loja, barr)
+
+
+def geral_exemplo() -> dict[str, Any]:
+    rnd = random.Random(35)
+    linhas = []
+    for i, p in enumerate(pl.b_posicoes_padrao()):
+        cod, nome = ("", "") if rnd.random() < 0.3 else rnd.choice(_PRODUTOS_DEMO)
+        linhas.append({"id": i + 1, "rotulo": p["rot"], "pos_x": p["x"], "pos_z": p["z"],
+                       "produto_codigo": cod, "produto_nome": nome, "quantidade": rnd.choice([1, 1, 2, 4]) if cod else 0})
+    return _juntar_geral(dados_exemplo(), loja_exemplo(), linhas)
