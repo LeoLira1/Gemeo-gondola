@@ -1,0 +1,235 @@
+"""Planta e regras do galpão de racks da CAMDA.
+
+Porte direto de LeoLira1/Gondolas (lib/galpao_config.dart, lib/galpao_saldo.dart
+e lib/codigos_vinculados.dart). Os números abaixo são os do app Flutter: se a
+planta for remedida, o ajuste é feito LÁ e copiado para cá.
+
+Sem Streamlit e sem rede, para poder ser testado.
+"""
+
+from __future__ import annotations
+
+import re
+import unicodedata
+from dataclasses import dataclass
+
+# ── Medidas do rack (metros) ────────────────────────────────────────────────
+COMPRIMENTO_RACK = 1.20   # lado que corre ao longo da rua
+LARGURA_RACK = 1.00       # lado atravessado à rua
+ALTURA_NIVEL = 1.10
+PASSO_POSICAO = 1.34      # rack (1,20) + folga
+PASSO_NIVEL = 1.16        # altura (1,10) + encaixe
+NIVEIS_MAX = 4
+PARTES = (1, 2)
+
+
+@dataclass(frozen=True)
+class Rua:
+    numero: int
+    parte: int
+    eixo: str            # 'x' ou 'z': eixo ao longo do qual as posições se sucedem
+    coord_fixa: float
+    centro: float
+    quantidade: int
+    primeiro_numero: int
+    primeiro_no_fim: bool
+    lado_corredor: int
+
+    @property
+    def ultimo_numero(self) -> int:
+        return self.primeiro_numero + self.quantidade - 1
+
+    def contem(self, numero: int) -> bool:
+        return self.primeiro_numero <= numero <= self.ultimo_numero
+
+
+# Tabela das ruas — GalpaoConfig.ruas.
+RUAS: tuple[Rua, ...] = (
+    # Parte 1 — 8 ruas, 85 posições (1–85)
+    Rua(1, 1, "z", 8.30, 1.00, 14, 1, True, -1),
+    Rua(2, 1, "x", -9.30, 0.50, 11, 15, True, 1),
+    Rua(3, 1, "z", -7.60, 0, 11, 26, False, 1),
+    Rua(4, 1, "z", -2.90, 0, 10, 37, False, -1),
+    Rua(5, 1, "z", -1.85, 0, 10, 47, False, 1),
+    Rua(6, 1, "z", 2.60, 0, 11, 57, True, -1),
+    Rua(7, 1, "z", 3.65, 0, 11, 68, False, 1),
+    Rua(8, 1, "x", 11.30, -2.18, 7, 79, False, -1),
+    # Parte 2 — 4 ruas de 11 (86–129), serpentina
+    Rua(9, 2, "z", 29.35, 0, 11, 86, False, -1),
+    Rua(10, 2, "z", 24.90, 0, 11, 97, True, -1),
+    Rua(11, 2, "z", 20.45, 0, 11, 108, False, -1),
+    Rua(12, 2, "z", 16.00, 0, 11, 119, True, -1),
+)
+
+
+@dataclass(frozen=True)
+class Posicao:
+    numero: int
+    rua: Rua
+    x: float
+    z: float
+
+    @property
+    def parte(self) -> int:
+        return self.rua.parte
+
+    @property
+    def tamanho_x(self) -> float:
+        return LARGURA_RACK if self.rua.eixo == "z" else COMPRIMENTO_RACK
+
+    @property
+    def tamanho_z(self) -> float:
+        return COMPRIMENTO_RACK if self.rua.eixo == "z" else LARGURA_RACK
+
+
+def _montar_posicoes() -> tuple[Posicao, ...]:
+    lista: list[Posicao] = []
+    for rua in RUAS:
+        for i in range(rua.quantidade):
+            desloc = (i - (rua.quantidade - 1) / 2) * PASSO_POSICAO
+            ordinal = rua.quantidade - 1 - i if rua.primeiro_no_fim else i
+            lista.append(
+                Posicao(
+                    numero=rua.primeiro_numero + ordinal,
+                    rua=rua,
+                    x=rua.coord_fixa if rua.eixo == "z" else rua.centro + desloc,
+                    z=rua.centro + desloc if rua.eixo == "z" else rua.coord_fixa,
+                )
+            )
+    lista.sort(key=lambda p: p.numero)
+    return tuple(lista)
+
+
+POSICOES: tuple[Posicao, ...] = _montar_posicoes()
+POSICAO_POR_NUMERO: dict[int, Posicao] = {p.numero: p for p in POSICOES}
+TOTAL_POSICOES = len(POSICOES)
+
+
+def y_base(ordem: int) -> float:
+    """Altura do piso do rack de ordem `ordem` (1 = o de baixo)."""
+    return (ordem - 1) * PASSO_NIVEL
+
+
+# ── Códigos que são o MESMO produto (codigos_vinculados.dart) ──────────────
+
+_ESPACOS = re.compile(r"\s+")
+
+
+def chave_nome_produto(texto: str) -> str:
+    """Maiúsculo, sem acento, espaços colapsados. Mesma chave do app do scanner."""
+    cru = (texto or "").strip().upper()
+    decomposto = unicodedata.normalize("NFD", cru)
+    sem_marcas = "".join(c for c in decomposto if not unicodedata.combining(c))
+    return _ESPACOS.sub(" ", sem_marcas).strip()
+
+
+def normalizar_codigo(codigo: str | None) -> str | None:
+    if codigo is None:
+        return None
+    texto = str(codigo).strip().upper()
+    return texto or None
+
+
+def grupos_de_codigos(
+    codigos,
+    produto_id_por_codigo: dict[str, str],
+    nome_por_codigo: dict[str, str],
+) -> dict[str, set[str]]:
+    """Para cada código, o conjunto de códigos que somam com ele.
+
+    1. Cadastro (mapa_produtos + mapa_produtos_codigos): vinculado a um
+       produto_id, o grupo são os códigos daquele produto_id.
+    2. Sem vínculo, o NOME: mesma chave de nome, ignorando quem já tem vínculo.
+    O grupo sempre contém o próprio código.
+    """
+    por_produto_id: dict[str, str] = {}
+    codigos_do_produto: dict[str, set[str]] = {}
+    for codigo, produto_id in produto_id_por_codigo.items():
+        c = normalizar_codigo(codigo)
+        p = str(produto_id).strip()
+        if c is None or not p:
+            continue
+        por_produto_id[c] = p
+        codigos_do_produto.setdefault(p, set()).add(c)
+
+    nomes: dict[str, str] = {}
+    for codigo, nome in nome_por_codigo.items():
+        c = normalizar_codigo(codigo)
+        if c is not None:
+            nomes[c] = nome
+
+    chave_por_codigo: dict[str, str] = {}
+    codigos_por_chave: dict[str, set[str]] = {}
+    for codigo, nome in nomes.items():
+        if codigo in por_produto_id:
+            continue
+        chave = chave_nome_produto(nome)
+        if not chave:  # nome em branco não junta nada
+            continue
+        chave_por_codigo[codigo] = chave
+        codigos_por_chave.setdefault(chave, set()).add(codigo)
+
+    grupos: dict[str, set[str]] = {}
+    for bruto in codigos:
+        codigo = normalizar_codigo(bruto)
+        if codigo is None or codigo in grupos:
+            continue
+        produto_id = por_produto_id.get(codigo)
+        if produto_id is not None:
+            grupos[codigo] = {codigo} | codigos_do_produto.get(produto_id, set())
+            continue
+        chave = chave_por_codigo.get(codigo)
+        grupos[codigo] = {codigo} if chave is None else {codigo} | codigos_por_chave[chave]
+    return grupos
+
+
+# ── Saldo sistema × endereçado (galpao_saldo.dart) ─────────────────────────
+
+TOLERANCIA = 0.001
+
+
+@dataclass(frozen=True)
+class Saldo:
+    codigo: str
+    qtd_sistema: float
+    enderecado: float
+    codigos_somados: tuple[str, ...] = ()
+
+    @property
+    def diferenca(self) -> float:
+        return self.enderecado - self.qtd_sistema
+
+    @property
+    def falta(self) -> bool:
+        """Carga do sistema sem endereço → rack VERMELHO."""
+        return self.diferenca < -TOLERANCIA
+
+    @property
+    def sobra(self) -> bool:
+        """Endereçado além do sistema → rack AZUL."""
+        return self.diferenca > TOLERANCIA
+
+
+def montar_saldos(
+    codigos,
+    grupos: dict[str, set[str]],
+    sistema_por_codigo: dict[str, float],
+    enderecado_por_codigo: dict[str, float],
+) -> dict[str, Saldo]:
+    """Saldo por código (chave = código como está em galpao_racks).
+
+    Soma TODOS os códigos do grupo nos dois lados. Produto sem NENHUMA linha
+    em estoque_mestre fica de fora: sem qtd_sistema não há saldo a afirmar.
+    """
+    saldos: dict[str, Saldo] = {}
+    for bruto in codigos:
+        codigo = normalizar_codigo(bruto)
+        if codigo is None or bruto in saldos:
+            continue
+        grupo = sorted(grupos.get(codigo, {codigo}))
+        if not any(c in sistema_por_codigo for c in grupo):
+            continue
+        sistema = sum(sistema_por_codigo.get(c, 0.0) for c in grupo)
+        enderecado = sum(enderecado_por_codigo.get(c, 0.0) for c in grupo)
+        saldos[bruto] = Saldo(bruto, sistema, enderecado, tuple(grupo))
+    return saldos

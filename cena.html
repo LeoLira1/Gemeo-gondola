@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #eeebe4; --panel: rgba(255,255,255,.88); --ink: #2b2a27; --muted: #8a877f;
+    --line: #d9d5cb; --accent: #e87722;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden;
+    font: 13px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
+  #wrap { position: relative; width: 100%; height: 100%; }
+  #gl { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(60,50,30,.10); backdrop-filter: blur(6px); }
+  #top { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-direction: column;
+    gap: 8px; pointer-events: none; }
+  #top > * { pointer-events: auto; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .seg { display: inline-flex; padding: 3px; gap: 3px; }
+  .seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 9px; cursor: pointer;
+    font: inherit; font-weight: 600; color: var(--muted); position: relative; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .seg button small { font-weight: 500; opacity: .8; margin-left: 4px; }
+  .field { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; }
+  .field label { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .field input { border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink); width: 150px; padding: 4px 0; }
+  .field input.num { width: 56px; }
+  .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,119,34,.25); }
+  .chips { padding: 4px; display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  .chip { border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 4px 10px; cursor: pointer;
+    font: inherit; font-weight: 600; color: #5d5a53; position: relative; }
+  .chip:hover { background: rgba(0,0,0,.05); }
+  .chip.on { background: var(--ink); color: #fff; }
+  .dot { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 0 2px #fff; display: none; }
+  .has > .dot { display: block; }
+  #msg { color: var(--muted); font-size: 12px; padding: 0 4px; }
+  #msg b { color: var(--accent); }
+  #stats { position: absolute; right: 12px; bottom: 12px; padding: 8px 12px; color: #5d5a53; font-size: 12px; text-align: right; }
+  #legend { position: absolute; left: 12px; bottom: 12px; padding: 8px 12px; display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 12px; color: #5d5a53; max-width: calc(100% - 200px); }
+  #legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px;
+    border: 1px solid rgba(0,0,0,.18); }
+  #info { position: absolute; right: 12px; top: 64px; width: 260px; padding: 10px 12px; display: none; }
+  #info h4 { margin: 0 0 6px; font-size: 13px; }
+  #info .lv { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; border-top: 1px solid var(--line); }
+  #info .lv span:first-child { color: var(--muted); font-weight: 600; }
+  #info .x { float: right; cursor: pointer; color: var(--muted); border: 0; background: none; font-size: 16px; line-height: 1; }
+  #tip { position: absolute; display: none; pointer-events: none; z-index: 5; max-width: 300px; padding: 8px 10px;
+    background: rgba(35,33,30,.94); color: #fff; border-radius: 9px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  #tip b { font-size: 13px; }
+  #tip .q { color: #ffc98a; font-weight: 700; }
+  #tip .w { margin-top: 3px; color: #ffb4a8; }
+  #tip .w.az { color: #9ec5ff; }
+  @media (max-width: 760px) { #info { display: none !important; } #legend { max-width: 100%; bottom: 52px; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="gl"></canvas>
+  <div id="top">
+    <div class="row">
+      <div class="panel seg" id="partes"></div>
+      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129" autocomplete="off"></div>
+      <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
+      <span id="msg"></span>
+    </div>
+    <div class="row"><div class="panel chips" id="chips"></div></div>
+  </div>
+  <div id="info" class="panel"></div>
+  <div id="legend" class="panel">
+    <span><i style="background:#f4f2ed"></i>Fecha com o sistema</span>
+    <span><i style="background:#e53935"></i>Carga sem endereço</span>
+    <span><i style="background:#1565C0"></i>Endereçado além do sistema</span>
+    <span><i style="background:#e87722"></i>Busca</span>
+    <span><i style="background:transparent;border:1px dashed #8d8b85"></i>Vaga livre</span>
+  </div>
+  <div id="stats" class="panel"></div>
+  <div id="tip"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const D = /*__DADOS__*/null;
+
+// ── Estado ──────────────────────────────────────────────────────────────────
+const ORANGE = 0xe87722, RED = 0xe53935, BLUE = 0x1565C0;
+const PALETE_H = 0.12;                       // palete de madeira sob a pilha
+const state = { parte: 1, rua: null, sel: null, matched: new Set(), hover: null };
+const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+const $ = (id) => document.getElementById(id);
+const fold = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+const posPorN = new Map(D.posicoes.map((p) => [p.n, p]));
+const pilhaDe = (n) => D.pilhas[String(n)] || [];
+const ruasDaParte = (p) => D.ruas.filter((r) => r.p === p);
+const normCod = (c) => (c || "").trim().toUpperCase();
+
+// ── Three.js ────────────────────────────────────────────────────────────────
+const canvas = $("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xeeebe4);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 400);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.47;
+controls.minDistance = 3;
+controls.maxDistance = 90;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xdcd6c9, 0.74));
+const sun = new THREE.DirectionalLight(0xffffff, 0.54);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+
+const mat = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.92, metalness: 0 }, extra));
+const M = {
+  branco: mat(0xf4f2ed), laranja: mat(0xe5701a, { roughness: 0.8 }),
+  vermelho: mat(RED), azul: mat(BLUE), madeira: mat(0xc99d66, { roughness: 1 }),
+  laje: mat(0xf8f6f1, { roughness: 1 }), vaga: new THREE.MeshBasicMaterial({ color: 0xe6e2d9, transparent: true, opacity: 0.45, depthWrite: false }),
+};
+const lineGris = new THREE.LineBasicMaterial({ color: 0x9a9892 });
+const lineFraca = new THREE.LineBasicMaterial({ color: 0xc9c5bb });
+const lineBorda = new THREE.LineBasicMaterial({ color: 0xcfcbc1, transparent: true, opacity: 0.9 });
+
+const geoCache = {};
+function boxGeo(w, h, d) {
+  const k = [w, h, d].join();
+  return (geoCache[k] ||= new THREE.BoxGeometry(w, h, d));
+}
+function edgesGeo(w, h, d) {
+  const k = "e" + [w, h, d].join();
+  return (geoCache[k] ||= new THREE.EdgesGeometry(boxGeo(w, h, d)));
+}
+
+// Laje do chão (uma só, redimensionada por parte)
+const laje = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), M.laje);
+laje.receiveShadow = true;
+scene.add(laje);
+
+// Rótulos (sprites com número)
+const texCache = {};
+function labelTex(texto, estilo) {
+  const k = texto + "|" + estilo;
+  if (texCache[k]) return texCache[k];
+  const c = document.createElement("canvas");
+  c.width = 160; c.height = 80;
+  const g = c.getContext("2d");
+  const cores = {
+    n: ["rgba(255,255,255,.92)", "#2b2a27", "#d4d0c6"],
+    h: ["#e87722", "#ffffff", "#e87722"],
+    s: ["#2b2a27", "#ffffff", "#2b2a27"],
+    r: ["rgba(255,255,255,0)", "#a6a298", "rgba(255,255,255,0)"],
+  }[estilo];
+  g.fillStyle = cores[0]; g.strokeStyle = cores[2]; g.lineWidth = 3;
+  g.beginPath(); g.roundRect ? g.roundRect(6, 8, 148, 64, 22) : g.rect(6, 8, 148, 64);
+  g.fill(); g.stroke();
+  g.fillStyle = cores[1];
+  g.font = (estilo === "r" ? "bold 46px" : "bold 44px") + " system-ui, Segoe UI, Arial, sans-serif";
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.fillText(texto, 80, 42);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  return (texCache[k] = t);
+}
+const rotulos = [];                        // {s, base}: reescalados com a distância da câmera
+function makeLabel(texto, estilo, w) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(texto, estilo), transparent: true, depthTest: false }));
+  s.scale.set(w, w / 2, 1);
+  s.renderOrder = 10;
+  s.userData.base = w;
+  rotulos.push(s);
+  return s;
+}
+
+// Uma "casa" por posição: grupo na posição do chão com pilha, vaga e rótulo
+const casas = new Map();
+for (const p of D.posicoes) {
+  const raiz = new THREE.Group();
+  raiz.position.set(p.x, 0, p.z);
+  const pilha = pilhaDe(p.n);
+  const niveis = Math.min(pilha.length, D.geo.niveisMax);
+
+  // contorno da vaga (sempre existe; só aparece quando vazia ou fantasma)
+  const rect = new THREE.LineSegments(edgesGeo(p.sx, 0.001, p.sz), lineGris);
+  rect.position.y = 0.01;
+  const tile = new THREE.Mesh(new THREE.PlaneGeometry(p.sx, p.sz), M.vaga);
+  tile.rotation.x = -Math.PI / 2;
+  tile.position.y = 0.012;
+  tile.userData = { n: p.n, o: 0 };
+  raiz.add(rect, tile);
+
+  const stack = new THREE.Group();
+  const racks = [];
+  if (niveis > 0) {
+    // palete de madeira (tampo + 3 travessas)
+    const tampo = new THREE.Mesh(boxGeo(p.sx * 0.97, 0.035, p.sz * 0.97), M.madeira);
+    tampo.position.y = PALETE_H - 0.0175;
+    tampo.castShadow = tampo.receiveShadow = true;
+    stack.add(tampo);
+    for (const f of [-0.4, 0, 0.4]) {
+      const along = p.sx < p.sz;                    // rua de eixo Z: travessas correm em Z
+      const t = new THREE.Mesh(
+        along ? boxGeo(p.sx * 0.12, PALETE_H - 0.035, p.sz * 0.97) : boxGeo(p.sx * 0.97, PALETE_H - 0.035, p.sz * 0.12), M.madeira);
+      t.position.set(along ? f * p.sx * 0.85 : 0, (PALETE_H - 0.035) / 2, along ? 0 : f * p.sz * 0.85);
+      t.castShadow = t.receiveShadow = true;
+      stack.add(t);
+    }
+    for (let i = 0; i < niveis; i++) {
+      const r = pilha[i];
+      const m = new THREE.Mesh(boxGeo(p.sx * 0.985, D.geo.alt, p.sz * 0.985), M.branco);
+      m.position.y = PALETE_H + i * D.geo.passoNivel + D.geo.alt / 2;
+      m.castShadow = m.receiveShadow = true;
+      m.userData = { n: p.n, o: r.o, rack: r };
+      const borda = new THREE.LineSegments(edgesGeo(p.sx * 0.985, D.geo.alt, p.sz * 0.985), lineBorda);
+      m.add(borda);
+      stack.add(m);
+      racks.push(m);
+    }
+  }
+  const topo = niveis > 0 ? PALETE_H + (niveis - 1) * D.geo.passoNivel + D.geo.alt : 0.1;
+  const rotulo = makeLabel(String(p.n), "n", 1);
+  rotulo.position.y = topo + 0.5;
+  stack.add(rotulo);
+  raiz.add(stack);
+  scene.add(raiz);
+  casas.set(p.n, { p, raiz, stack, rect, tile, racks, rotulo, topo, vazia: niveis === 0 });
+}
+
+// Rótulos de rua (R1…R12) na ponta de menor coordenada de cada rua
+const rotulosRua = new Map();
+for (const r of D.ruas) {
+  const ps = D.posicoes.filter((p) => p.r === r.n);
+  const eixoZ = r.eixo === "z";
+  const ref = ps.reduce((a, b) => ((eixoZ ? b.z < a.z : b.x < a.x) ? b : a));
+  const lado = r.lado * 0.9;      // do lado do corredor: as ruas em par (4/5, 6/7) não se sobrepõem
+  const s = makeLabel("R" + r.n, "r", 1);
+  s.userData.base = 1.5;
+  s.position.set(eixoZ ? ref.x + lado : ref.x - 2.3, 0.15, eixoZ ? ref.z - 2.3 : ref.z + lado);
+  scene.add(s);
+  rotulosRua.set(r.n, s);
+}
+
+// Seleção (busca por número) e destaque de hover
+const selGrupo = new THREE.Group();
+const selFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.35, depthWrite: false }));
+selFill.rotation.x = -Math.PI / 2; selFill.position.y = 0.02;
+const selBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: ORANGE }));
+selGrupo.add(selFill, selBox);
+selGrupo.visible = false;
+scene.add(selGrupo);
+
+const hoverBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0x2b2a27 }));
+hoverBox.visible = false;
+scene.add(hoverBox);
+
+// ── Cores ───────────────────────────────────────────────────────────────────
+function materialDo(r) {
+  if (state.matched.size && state.matched.has(normCod(r.c))) return M.laranja;     // busca > saldo
+  const d = D.divergencia[r.c];
+  if (d) return d.t === "falta" ? M.vermelho : M.azul;
+  return M.branco;
+}
+function pintar() {
+  for (const c of casas.values()) {
+    for (const m of c.racks) m.material = materialDo(m.userData.rack);
+    const estilo = state.sel === c.p.n ? "s" : (c.racks.some((m) => m.material === M.laranja) ? "h" : "n");
+    c.rotulo.material.map = labelTex(String(c.p.n), estilo);
+    c.rotulo.material.needsUpdate = true;
+  }
+  dirty = true;
+}
+
+// ── Visibilidade (parte + rua) e interação ──────────────────────────────────
+let alvos = [];
+function atualizarVisibilidade() {
+  alvos = [];
+  for (const c of casas.values()) {
+    const naParte = c.p.p === state.parte;
+    const naRua = state.rua === null || c.p.r === state.rua;
+    c.raiz.visible = naParte;
+    if (!naParte) continue;
+    const mostrar = naRua;
+    c.stack.visible = mostrar;               // pilha + palete + rótulo (a vaga livre só tem o rótulo)
+    c.rect.visible = c.vazia || !mostrar;
+    c.rect.material = mostrar ? lineGris : lineFraca;
+    c.tile.visible = c.vazia && mostrar;
+    if (mostrar) {
+      if (c.vazia) alvos.push(c.tile); else alvos.push(...c.racks);
+    }
+  }
+  for (const [n, s] of rotulosRua) {
+    const r = D.ruas.find((x) => x.n === n);
+    s.visible = r.p === state.parte;
+  }
+  dirty = true;
+}
+
+// Laje + luz + enquadramento
+function envelope(filtro) {
+  let a = { minX: 1e9, maxX: -1e9, minZ: 1e9, maxZ: -1e9 };
+  for (const p of D.posicoes) {
+    if (!filtro(p)) continue;
+    a.minX = Math.min(a.minX, p.x - p.sx / 2); a.maxX = Math.max(a.maxX, p.x + p.sx / 2);
+    a.minZ = Math.min(a.minZ, p.z - p.sz / 2); a.maxZ = Math.max(a.maxZ, p.z + p.sz / 2);
+  }
+  return a;
+}
+function ajustarLaje() {
+  const e = envelope((p) => p.p === state.parte);
+  const margem = 2.6;
+  laje.scale.set(e.maxX - e.minX + margem * 2, 1, e.maxZ - e.minZ + margem * 2);
+  laje.position.set((e.minX + e.maxX) / 2, -0.1, (e.minZ + e.maxZ) / 2);
+  const R = Math.hypot(e.maxX - e.minX, e.maxZ - e.minZ) / 2 + 4;
+  const cx = (e.minX + e.maxX) / 2, cz = (e.minZ + e.maxZ) / 2;
+  sun.target.position.set(cx, 0, cz);
+  sun.position.set(cx - 0.55 * R, 1.35 * R, cz + 0.8 * R);
+  Object.assign(sun.shadow.camera, { left: -R, right: R, top: R, bottom: -R, near: 1, far: 6 * R });
+  sun.shadow.camera.updateProjectionMatrix();
+}
+
+const DIR = new THREE.Vector3(0.28, 0.82, 0.86).normalize();       // olho: de frente (Z+), de cima, levemente à direita
+let tween = null;
+function voarPara(alvo, pos, dur = 650) {
+  tween = { t0: performance.now(), dur, p0: camera.position.clone(), t_0: controls.target.clone(), p1: pos, t1: alvo };
+}
+const _cam = new THREE.PerspectiveCamera();
+const FAIXA = { xMax: 0.95, yMax: 0.72, yMin: -0.82 };   // folga p/ a barra de cima e a legenda
+// Caixa (área × altura da pilha) projetada na câmera para uma distância: {x, yMin, yMax} em NDC.
+function projetar(alvo, dist, cantos) {
+  _cam.fov = camera.fov; _cam.aspect = camera.aspect; _cam.near = 0.1; _cam.far = 1000;
+  _cam.updateProjectionMatrix();
+  _cam.position.copy(alvo).addScaledVector(DIR, dist);
+  _cam.lookAt(alvo); _cam.updateMatrixWorld(); _cam.matrixWorldInverse.copy(_cam.matrixWorld).invert();
+  let x = 0, yMin = 1e9, yMax = -1e9;
+  for (const c of cantos) { const v = c.clone().project(_cam); x = Math.max(x, Math.abs(v.x)); yMin = Math.min(yMin, v.y); yMax = Math.max(yMax, v.y); }
+  return { x, yMin, yMax };
+}
+function enquadrar(filtro, animar = true) {
+  const e = envelope(filtro);
+  const cantos = [];
+  for (const x of [e.minX, e.maxX]) for (const z of [e.minZ, e.maxZ]) for (const y of [0, 5.4]) cantos.push(new THREE.Vector3(x, y, z));
+  const alvo = new THREE.Vector3((e.minX + e.maxX) / 2, 0.8, (e.minZ + e.maxZ) / 2);
+  const frente = new THREE.Vector3(-DIR.x, 0, -DIR.z).normalize();    // "para cima" da tela, no chão
+  const sinEl = DIR.y, tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  let dist = 30;
+  for (let it = 0; it < 4; it++) {
+    // menor distância que cabe (bisseção) …
+    let lo = 4, hi = 260;
+    for (let i = 0; i < 28; i++) {
+      const mid = (lo + hi) / 2, r = projetar(alvo, mid, cantos);
+      if (r.x <= FAIXA.xMax && r.yMax <= FAIXA.yMax && r.yMin >= FAIXA.yMin) hi = mid; else lo = mid;
+    }
+    dist = hi;
+    // … e centra a caixa na faixa livre deslocando o alvo no chão
+    const r = projetar(alvo, dist, cantos);
+    const sobra = ((FAIXA.yMax + FAIXA.yMin) / 2) - (r.yMax + r.yMin) / 2;      // >0: a caixa está baixa demais
+    alvo.addScaledVector(frente, -sobra * dist * tanV / sinEl);
+  }
+  const pos = alvo.clone().addScaledVector(DIR, dist);
+  if (animar) voarPara(alvo, pos); else { camera.position.copy(pos); controls.target.copy(alvo); controls.update(); }
+  dirty = true;
+}
+const enquadrarVista = (animar = true) =>
+  enquadrar((p) => p.p === state.parte && (state.rua === null || p.r === state.rua), animar);
+
+// ── UI: partes e chips ──────────────────────────────────────────────────────
+function montarPartes() {
+  const box = $("partes");
+  box.innerHTML = "";
+  for (const parte of [1, 2]) {
+    const b = document.createElement("button");
+    const n = D.posicoes.filter((p) => p.p === parte).length;
+    b.className = parte === state.parte ? "on" : "";
+    b.dataset.parte = parte;
+    b.innerHTML = `Parte ${parte}<small>${n}</small><span class="dot"></span>`;
+    b.onclick = () => irParte(parte);
+    box.appendChild(b);
+  }
+}
+function montarChips() {
+  const box = $("chips");
+  box.innerHTML = "";
+  const mk = (txt, rua) => {
+    const b = document.createElement("button");
+    b.className = "chip" + (state.rua === rua ? " on" : "");
+    b.dataset.rua = rua === null ? "" : rua;
+    b.innerHTML = `${txt}<span class="dot"></span>`;
+    b.onclick = () => { state.rua = rua; refrescar(); enquadrarVista(); };
+    box.appendChild(b);
+  };
+  mk("Todas", null);
+  for (const r of ruasDaParte(state.parte)) mk("R" + r.n, r.n);
+  marcarPontos();
+}
+
+// Posições e ruas onde a busca de produto acende algo
+function acertos() {
+  const pos = [];
+  if (state.matched.size) {
+    for (const c of casas.values()) if (c.racks.some((m) => state.matched.has(normCod(m.userData.rack.c)))) pos.push(c.p);
+  }
+  return pos;
+}
+function marcarPontos() {
+  const pos = acertos();
+  const ruas = new Set(pos.map((p) => p.r)), partes = new Set(pos.map((p) => p.p));
+  document.querySelectorAll("#chips .chip").forEach((b) => {
+    b.classList.toggle("has", b.dataset.rua !== "" && ruas.has(+b.dataset.rua));
+  });
+  document.querySelectorAll("#partes button").forEach((b) => b.classList.toggle("has", partes.has(+b.dataset.parte)));
+  return pos;
+}
+
+function atualizarStats() {
+  const cs = [...casas.values()].filter((c) => c.p.p === state.parte);
+  const livres = cs.filter((c) => c.vazia).length;
+  const racks = cs.reduce((s, c) => s + c.racks.length, 0);
+  $("stats").innerHTML = `Parte ${state.parte}: <b>${cs.length}</b> posições · <b>${cs.length - livres}</b> com carga · <b>${livres}</b> livres · <b>${racks}</b> racks`;
+}
+
+function refrescar() {
+  montarPartes(); montarChips(); atualizarVisibilidade(); ajustarLaje(); atualizarStats(); pintar(); atualizarSelecao();
+}
+function irParte(parte, animar = true) {
+  if (state.parte !== parte) { state.parte = parte; state.rua = null; refrescar(); enquadrarVista(animar); }
+  else if (state.rua !== null) { state.rua = null; refrescar(); enquadrarVista(animar); }
+}
+
+// ── Busca por número ────────────────────────────────────────────────────────
+function atualizarSelecao() {
+  const c = state.sel && casas.get(state.sel);
+  if (!c || c.p.p !== state.parte) { selGrupo.visible = false; hideInfo(); dirty = true; return; }
+  const h = Math.max(c.topo, 0.6);
+  selFill.scale.set(c.p.sx + 0.5, c.p.sz + 0.5, 1);
+  selBox.scale.set(c.p.sx + 0.18, h, c.p.sz + 0.18);
+  selBox.position.y = h / 2;
+  selGrupo.position.set(c.p.x, 0, c.p.z);
+  selGrupo.visible = true;
+  mostrarInfo(c);
+  dirty = true;
+}
+function irParaPosicao(n) {
+  const c = casas.get(n);
+  if (!c) return;
+  state.sel = n;
+  const mudou = state.parte !== c.p.p || state.rua !== null;
+  state.parte = c.p.p; state.rua = null;
+  refrescar();
+  if (mudou) { enquadrarVista(false); }
+  const alvo = new THREE.Vector3(c.p.x, Math.max(c.topo / 2, 0.4), c.p.z);
+  voarPara(alvo, alvo.clone().addScaledVector(DIR, 13));
+}
+function mostrarInfo(c) {
+  const el = $("info"), p = c.p;
+  const pilha = pilhaDe(p.n);
+  const linhas = pilha.length
+    ? [...pilha].reverse().map((r) => `<div class="lv"><span>N${r.o}</span><span style="text-align:right">${esc(r.nome || r.c)}<br><b>${fmt.format(r.q)} un</b></span></div>`).join("")
+    : `<div class="lv"><span></span><span>Vaga livre</span></div>`;
+  el.innerHTML = `<button class="x" title="Fechar">×</button><h4>Posição ${p.n} · Rua ${p.r} · Parte ${p.p}</h4>${linhas}`;
+  el.style.display = "block";
+  el.querySelector(".x").onclick = () => { state.sel = null; $("qNum").value = ""; refrescar(); };
+}
+function hideInfo() { $("info").style.display = "none"; }
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+let tNum = null;
+$("qNum").addEventListener("input", () => {
+  clearTimeout(tNum);
+  tNum = setTimeout(() => {
+    const v = $("qNum").value.trim();
+    if (!v) { state.sel = null; refrescar(); return; }
+    const n = parseInt(v, 10);
+    if (/^\d+$/.test(v) && posPorN.has(n)) irParaPosicao(n);
+  }, 350);
+});
+$("qNum").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  clearTimeout(tNum);
+  const n = parseInt($("qNum").value, 10);
+  if (posPorN.has(n)) irParaPosicao(n);
+});
+
+// ── Busca por produto ───────────────────────────────────────────────────────
+const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, k: fold(p.n) + " " + fold(p.c) }));
+function buscarProduto(q) {
+  const limpa = fold(q).trim();
+  if (limpa.length < 2) return [];
+  const termos = limpa.split(/\s+/);
+  return catalogo.filter((p) => termos.every((t) => p.k.includes(t)));
+}
+let tProd = null;
+$("qProd").addEventListener("input", () => {
+  clearTimeout(tProd);
+  tProd = setTimeout(aplicarBuscaProduto, 220);
+});
+function aplicarBuscaProduto() {
+  const q = $("qProd").value;
+  const achados = buscarProduto(q);
+  state.matched = new Set(achados.map((p) => normCod(p.c)));
+  const msg = $("msg");
+  if (!state.matched.size) {
+    msg.innerHTML = q.trim().length >= 2 ? "nenhum produto no galpão" : "";
+    pintar(); marcarPontos(); return;
+  }
+  const pos = marcarPontos();
+  const ruas = new Set(pos.map((p) => p.r));
+  msg.innerHTML = `<b>${achados.length}</b> produto${achados.length > 1 ? "s" : ""} · <b>${pos.length}</b> posiç${pos.length === 1 ? "ão" : "ões"} · ${ruas.size} rua${ruas.size === 1 ? "" : "s"}`;
+  // Se nada do produto está na parte aberta, abre a parte onde ele está.
+  const naParte = pos.some((p) => p.p === state.parte);
+  if (!naParte && pos.length) { state.parte = pos[0].p; }
+  state.rua = null;                                    // várias ruas → "Todas"
+  refrescar(); enquadrarVista();
+}
+
+// ── Tooltip ─────────────────────────────────────────────────────────────────
+const ray = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tip = $("tip");
+let ultimoMouse = null;
+canvas.addEventListener("pointermove", (e) => {
+  const rc = canvas.getBoundingClientRect();
+  ultimoMouse = { x: e.clientX - rc.left, y: e.clientY - rc.top };
+  mouse.set((ultimoMouse.x / rc.width) * 2 - 1, -(ultimoMouse.y / rc.height) * 2 + 1);
+  verHover();
+});
+canvas.addEventListener("pointerleave", () => { tip.style.display = "none"; hoverBox.visible = false; dirty = true; });
+function verHover() {
+  if (e_dragging) return;
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(alvos, false)[0];
+  if (!hit) { tip.style.display = "none"; hoverBox.visible = false; canvas.style.cursor = ""; dirty = true; return; }
+  const o = hit.object, ud = o.userData, c = casas.get(ud.n);
+  canvas.style.cursor = "pointer";
+  tip.textContent = "";
+  const t = (tag, txt, cls) => { const el = document.createElement(tag); el.textContent = txt; if (cls) el.className = cls; tip.appendChild(el); return el; };
+  if (ud.rack) {
+    const r = ud.rack;
+    t("b", `${ud.n} · N${ud.o}`);
+    tip.appendChild(document.createElement("br"));
+    t("span", r.nome || "(sem nome)");
+    tip.appendChild(document.createElement("br"));
+    t("span", `Cód. ${r.c}  `);
+    t("span", `${fmt.format(r.q)} un`, "q");
+    const d = D.divergencia[r.c];
+    if (d) {
+      const dif = Math.abs(d.end - d.sis);
+      t("div", d.t === "falta" ? `Faltam ${fmt.format(dif)} un por endereçar` : `${fmt.format(dif)} un endereçadas além do sistema`, d.t === "falta" ? "w" : "w az");
+      t("div", `Sistema ${fmt.format(d.sis)} · endereçado ${fmt.format(d.end)}` + (d.cods.length ? ` · ${d.cods.join(" + ")}` : ""), d.t === "falta" ? "w" : "w az");
+    }
+    hoverBox.scale.set(c.p.sx * 0.995 + 0.04, D.geo.alt + 0.04, c.p.sz * 0.995 + 0.04);
+    hoverBox.position.set(c.p.x, o.position.y, c.p.z);
+  } else {
+    t("b", `${ud.n} · vaga livre`);
+    hoverBox.scale.set(c.p.sx + 0.04, 0.1, c.p.sz + 0.04);
+    hoverBox.position.set(c.p.x, 0.05, c.p.z);
+  }
+  hoverBox.visible = true;
+  tip.style.display = "block";
+  const w = $("wrap").clientWidth;
+  tip.style.left = Math.min(ultimoMouse.x + 16, w - tip.offsetWidth - 8) + "px";
+  tip.style.top = Math.max(ultimoMouse.y - tip.offsetHeight - 12, 6) + "px";
+  dirty = true;
+}
+let e_dragging = false;
+canvas.addEventListener("pointerdown", () => { e_dragging = true; tip.style.display = "none"; });
+window.addEventListener("pointerup", () => { e_dragging = false; });
+canvas.addEventListener("click", (e) => {
+  // clique numa pilha seleciona a posição (abre o cartão com os níveis)
+  const rc = canvas.getBoundingClientRect();
+  mouse.set(((e.clientX - rc.left) / rc.width) * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(alvos, false)[0];
+  if (hit && !moveu) { state.sel = hit.object.userData.n; $("qNum").value = String(state.sel); atualizarSelecao(); pintar(); }
+});
+let moveu = false, down = null;
+canvas.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; moveu = false; });
+canvas.addEventListener("pointermove", (e) => { if (down && Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) moveu = true; });
+
+// ── Loop ────────────────────────────────────────────────────────────────────
+let dirty = true;
+controls.addEventListener("change", () => { dirty = true; });
+function redimensionar() {
+  const w = $("wrap").clientWidth, h = $("wrap").clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  dirty = true;
+}
+new ResizeObserver(redimensionar).observe($("wrap"));
+
+const tmpV = new THREE.Vector3();
+const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (tween) {
+    const k = Math.min((now - tween.t0) / tween.dur, 1), e = ease(k);
+    camera.position.lerpVectors(tween.p0, tween.p1, e);
+    controls.target.lerpVectors(tween.t_0, tween.t1, e);
+    if (k >= 1) tween = null;
+    dirty = true;
+  }
+  // rótulos com tamanho quase constante na tela (sem crescer no zoom nem sumir ao afastar)
+  for (const s of rotulos) {
+    const d = camera.position.distanceTo(s.getWorldPosition(tmpV));
+    const k = THREE.MathUtils.clamp(d * 0.034, 0.7, 1.6) * s.userData.base;
+    if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2, 1); dirty = true; }
+  }
+  if (selGrupo.visible) { selFill.material.opacity = 0.28 + 0.14 * Math.sin(now / 280); dirty = true; }
+  if (controls.update()) dirty = true;
+  if (!dirty) return;
+  dirty = false;
+  renderer.render(scene, camera);
+}
+
+// ── Início ──────────────────────────────────────────────────────────────────
+redimensionar();
+refrescar();
+enquadrarVista(false);
+requestAnimationFrame(frame);
+window.__galpao = { state, casas, D, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
+</script>
+</body>
+</html>
