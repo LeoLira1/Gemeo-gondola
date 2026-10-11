@@ -6,7 +6,7 @@
 <style>
   :root {
     --bg: #eeebe4; --panel: rgba(255,255,255,.88); --ink: #2b2a27; --muted: #8a877f;
-    --line: #d9d5cb; --accent: #e87722;
+    --line: #d9d5cb; --accent: #e87722; --hit: #2e9e4f;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden;
@@ -35,10 +35,10 @@
   .chip:hover { background: rgba(0,0,0,.05); }
   .chip.on { background: var(--ink); color: #fff; }
   .dot { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%;
-    background: var(--accent); box-shadow: 0 0 0 2px #fff; display: none; }
+    background: var(--hit); box-shadow: 0 0 0 2px #fff; display: none; }
   .has > .dot { display: block; }
   #msg { color: var(--muted); font-size: 12px; padding: 0 4px; }
-  #msg b { color: var(--accent); }
+  #msg b { color: var(--hit); }
   #stats { position: absolute; right: 12px; bottom: 12px; padding: 8px 12px; color: #5d5a53; font-size: 12px; text-align: right; }
   #legend { position: absolute; left: 12px; bottom: 12px; padding: 8px 12px; display: flex; gap: 14px; flex-wrap: wrap;
     font-size: 12px; color: #5d5a53; max-width: calc(100% - 200px); }
@@ -75,7 +75,7 @@
     <span><i style="background:#f4f2ed"></i>Fecha com o sistema</span>
     <span><i style="background:#e53935"></i>Carga sem endereço</span>
     <span><i style="background:#1565C0"></i>Endereçado além do sistema</span>
-    <span><i style="background:#e87722"></i>Busca</span>
+    <span><i style="background:#2e9e4f"></i>Produto buscado</span>
     <span><i style="background:transparent;border:1px dashed #8d8b85"></i>Vaga livre</span>
   </div>
   <div id="stats" class="panel"></div>
@@ -89,7 +89,7 @@
 const D = /*__DADOS__*/null;
 
 // ── Estado ──────────────────────────────────────────────────────────────────
-const ORANGE = 0xe87722, RED = 0xe53935, BLUE = 0x1565C0;
+const ORANGE = 0xe87722, GREEN = 0x2e9e4f, RED = 0xe53935, BLUE = 0x1565C0;
 const PALETE_H = 0.12;                       // palete de madeira sob a pilha
 const state = { parte: 1, rua: null, sel: null, matched: new Set(), hover: null };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
@@ -128,7 +128,7 @@ scene.add(sun, sun.target);
 
 const mat = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.92, metalness: 0 }, extra));
 const M = {
-  branco: mat(0xf4f2ed), laranja: mat(0xe5701a, { roughness: 0.8 }),
+  branco: mat(0xf4f2ed), verde: mat(0x2e9e4f, { roughness: 0.8 }),
   vermelho: mat(RED), azul: mat(BLUE), madeira: mat(0xc99d66, { roughness: 1 }),
   laje: mat(0xf8f6f1, { roughness: 1 }), vaga: new THREE.MeshBasicMaterial({ color: 0xe6e2d9, transparent: true, opacity: 0.45, depthWrite: false }),
 };
@@ -161,7 +161,7 @@ function labelTex(texto, estilo) {
   const g = c.getContext("2d");
   const cores = {
     n: ["rgba(255,255,255,.92)", "#2b2a27", "#d4d0c6"],
-    h: ["#e87722", "#ffffff", "#e87722"],
+    h: ["#2e9e4f", "#ffffff", "#2e9e4f"],
     s: ["#2b2a27", "#ffffff", "#2b2a27"],
     r: ["rgba(255,255,255,0)", "#a6a298", "rgba(255,255,255,0)"],
   }[estilo];
@@ -269,7 +269,7 @@ scene.add(hoverBox);
 
 // ── Cores ───────────────────────────────────────────────────────────────────
 function materialDo(r) {
-  if (state.matched.size && state.matched.has(normCod(r.c))) return M.laranja;     // busca > saldo
+  if (state.matched.size && state.matched.has(normCod(r.c))) return M.verde;     // busca > saldo
   const d = D.divergencia[r.c];
   if (d) return d.t === "falta" ? M.vermelho : M.azul;
   return M.branco;
@@ -277,7 +277,7 @@ function materialDo(r) {
 function pintar() {
   for (const c of casas.values()) {
     for (const m of c.racks) m.material = materialDo(m.userData.rack);
-    const estilo = state.sel === c.p.n ? "s" : (c.racks.some((m) => m.material === M.laranja) ? "h" : "n");
+    const estilo = state.sel === c.p.n ? "s" : (c.racks.some((m) => m.material === M.verde) ? "h" : "n");
     c.rotulo.material.map = labelTex(String(c.p.n), estilo);
     c.rotulo.material.needsUpdate = true;
   }
