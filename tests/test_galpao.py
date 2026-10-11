@@ -151,3 +151,46 @@ def test_exemplo_da_loja():
     import dados as dd2
     d = dd2.loja_exemplo()
     assert len(d["itens"]) == 22 and any(i["prod"] for i in d["itens"])
+
+
+# ── Barracão ────────────────────────────────────────────────────────────────
+import barracao as br
+
+
+def test_barracao_padrao_100_paletes():
+    pal = br.posicoes_padrao()
+    assert len(pal) == 100 and pal[0]["rot"] == "BAR-01" and pal[-1]["rot"] == "BAR-100"
+    assert br.colunas() == 25 and br.FILEIRAS == 4
+    assert [br.z_da_fileira(i) for i in range(4)] == [930, 810, 310, 190]       # cm, do fundo para a frente
+    assert br.corredor_livre() == 400                                           # corredor de manobra
+    for p in pal:                                                               # tudo cabe entre as paredes
+        assert 20 <= p["x"] - br.PALETE_X / 2 and p["x"] + br.PALETE_X / 2 <= 3480
+        assert 20 <= p["z"] - br.PALETE_Z / 2 and p["z"] + br.PALETE_Z / 2 <= 980
+    # a primeira fileira de frente deixa a folga das aberturas (500 cm livres na frente)
+    assert br.z_da_fileira(3) - br.PALETE_Z / 2 == 140
+
+
+def test_barracao_medidas_e_aberturas():
+    assert (br.LARGURA, br.PROFUNDIDADE, br.PE_DIREITO) == (3500, 1000, 600)
+    assert [(t, a, b, h) for t, a, b, h in br.ABERTURAS] == [("PORTA", 600, 800, 300), ("PORTÃO", 1300, 1800, 450), ("PORTA", 2300, 2500, 300)]
+    d = br.montar(None)
+    assert d["w"] == 35 and d["d"] == 10 and d["padrao"] and len(d["avisos"]) == 1
+
+
+def test_montar_barracao_do_banco():
+    linhas = [
+        {"id": 1, "rotulo": "BAR-01", "pos_x": 130, "pos_z": 930, "produto_codigo": "A", "produto_nome": "PROD A", "quantidade": 2},
+        {"id": 2, "rotulo": "BAR-02", "pos_x": 265, "pos_z": 930, "produto_codigo": "", "produto_nome": "", "quantidade": 0},
+        {"id": 3, "rotulo": "BAR-03", "pos_x": 130, "pos_z": 310, "produto_codigo": "B", "produto_nome": "PROD B", "quantidade": 1},
+    ]
+    d = br.montar(linhas)
+    assert not d["padrao"] and d["avisos"] == [] and d["fileiras"] == 2
+    assert d["pal"][0]["x"] == 1.3 and d["pal"][0]["z"] == 9.3 and d["pal"][0]["f"] == 1 and d["pal"][2]["f"] == 2
+    assert [c["c"] for c in d["catalogo"]] == ["A", "B"]                         # palete livre não entra no catálogo
+    assert len(br.montar([])["pal"]) == 100                                      # tabela vazia → layout padrão
+
+
+def test_barracao_exemplo():
+    import dados as ddb
+    d = ddb.barracao_exemplo()
+    assert len(d["pal"]) == 100 and any(p["c"] for p in d["pal"]) and any(not p["c"] for p in d["pal"])

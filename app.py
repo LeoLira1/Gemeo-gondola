@@ -19,7 +19,8 @@ import dados as dd
 ALTURA_MAPA = 780
 UI_CSS = Path(__file__).with_name("ui.css")
 UI_JS = Path(__file__).with_name("ui.js")
-CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html")}
+CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html"),
+         "barracao": Path(__file__).with_name("cena_barracao.html")}
 
 st.set_page_config(page_title="CAMDA · Mapas 3D", page_icon="📦", layout="wide")
 st.markdown(
@@ -61,13 +62,13 @@ def _segredo(nome: str) -> str | None:
 @st.cache_data(ttl=60, show_spinner="Lendo o Turso…")
 def ler_banco(url: str, token: str, mapa: str) -> tuple[dict, str]:
     """Lê o mapa pedido. Só é cacheado quando dá certo (exceção não entra no cache)."""
-    ler = {"galpao": dd.ler_turso, "loja": dd.ler_loja}[mapa]
+    ler = {"galpao": dd.ler_turso, "loja": dd.ler_loja, "barracao": dd.ler_barracao}[mapa]
     return ler(url, token), datetime.now().strftime("%H:%M:%S")
 
 
 def carregar(mapa: str) -> tuple[dict, str | None, str | None]:
     """(dados, hora da leitura, motivo do fallback). Motivo != None → dados de exemplo."""
-    exemplo = {"galpao": dd.dados_exemplo, "loja": dd.loja_exemplo}[mapa]
+    exemplo = {"galpao": dd.dados_exemplo, "loja": dd.loja_exemplo, "barracao": dd.barracao_exemplo}[mapa]
     url, token = _segredo("TURSO_URL"), _segredo("TURSO_TOKEN")
     if not url or not token:
         return exemplo(), None, "TURSO_URL / TURSO_TOKEN não configurados em st.secrets"
@@ -95,7 +96,7 @@ def cena_html(dados: dict, mapa: str) -> str:
 
 
 # ── Página ──────────────────────────────────────────────────────────────────
-MAPAS = {"Galpão": "galpao", "Loja": "loja"}
+MAPAS = {"Galpão": "galpao", "Loja": "loja", "Barracão": "barracao"}
 
 c_marca, c_mapa, c_btn = st.columns([3, 4, 1.2], vertical_alignment="center")
 c_marca.markdown(
@@ -132,6 +133,16 @@ if mapa == "galpao":
         _stat("racks", sum(len(p) for p in pilhas.values())),
         _stat("produtos com carga sem endereço", falta, "#e53935"),
         _stat("endereçados além do sistema", sobra, "#1565C0"),
+    ]
+elif mapa == "barracao":
+    pal = dados["pal"]
+    ocupados = [p for p in pal if p["c"].strip()]
+    chips = [
+        _stat(f"de {len(pal)} paletes com bag", len(ocupados), "#c99d66"),
+        _stat("livres", len(pal) - len(ocupados)),
+        _stat("unidades", f"{sum(p['q'] for p in ocupados):g}"),
+        _stat("produtos", len(dados["catalogo"])),
+        _stat(f"fileiras · corredor de {dados['corredor']:g} m", dados["fileiras"]),
     ]
 else:
     itens = [i for i in dados["itens"] if i["kind"] != "balcao"]

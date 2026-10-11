@@ -13,6 +13,7 @@ from typing import Any
 import requests
 
 import galpao as g
+import barracao as br
 import loja as lj
 
 TIMEOUT_S = 20
@@ -334,3 +335,28 @@ def loja_exemplo() -> dict[str, Any]:
     dados = lj.montar(gond, est, qtd)
     dados["avisos"] = []
     return dados
+
+
+# ── Barracão ────────────────────────────────────────────────────────────────
+
+SQL_BARRACAO = (
+    "SELECT id, rotulo, pos_x, pos_z, produto_codigo, produto_nome, quantidade "
+    "FROM barracao_enderecos ORDER BY id"
+)
+
+
+def ler_barracao(url: str, token: str) -> dict[str, Any]:
+    """Barracão: um palete por linha de barracao_enderecos. Tabela ausente/vazia → layout padrão."""
+    (linhas,) = consultar(url, token, [SQL_BARRACAO])
+    return br.montar(linhas)
+
+
+def barracao_exemplo() -> dict[str, Any]:
+    """Barracão fictício, determinístico, só para ver o mapa sem o banco."""
+    rnd = random.Random(35)
+    linhas = []
+    for i, p in enumerate(br.posicoes_padrao()):
+        cod, nome = ("", "") if rnd.random() < 0.3 else rnd.choice(_PRODUTOS_DEMO)
+        linhas.append({"id": i + 1, "rotulo": p["rot"], "pos_x": p["x"], "pos_z": p["z"],
+                       "produto_codigo": cod, "produto_nome": nome, "quantidade": rnd.choice([1, 1, 2, 4]) if cod else 0})
+    return br.montar(linhas)
