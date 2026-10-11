@@ -3,70 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  :root { --bg: #eeebe4; --panel: rgba(255,255,255,.88); --ink: #2b2a27; --muted: #8a877f;
-    --line: #d9d5cb; --accent: #e87722; --hit: #2e9e4f; }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden;
-    font: 13px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
-  #wrap { position: relative; width: 100%; height: 100%; }
-  #gl { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
-    box-shadow: 0 6px 24px rgba(60,50,30,.10); backdrop-filter: blur(6px); }
-  #top { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 8px;
-    align-items: center; pointer-events: none; }
-  #top > * { pointer-events: auto; }
-  .seg { display: inline-flex; padding: 3px; gap: 3px; flex-wrap: wrap; }
-  .seg button { border: 0; background: transparent; padding: 6px 12px; border-radius: 9px; cursor: pointer;
-    font: inherit; font-weight: 600; color: var(--muted); position: relative; }
-  .seg button.on { background: var(--accent); color: #fff; }
-  .dot { position: absolute; top: 2px; right: 2px; width: 8px; height: 8px; border-radius: 50%;
-    background: var(--hit); box-shadow: 0 0 0 2px #fff; display: none; }
-  .has > .dot { display: block; }
-  .field { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; }
-  .field label { color: var(--muted); font-weight: 600; font-size: 12px; }
-  .field input { border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink); width: 150px; padding: 4px 0; }
-  .field input.num { width: 84px; }
-  .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(232,119,34,.25); }
-  .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 8px 12px; cursor: pointer;
-    font: inherit; font-weight: 600; color: #5d5a53; box-shadow: 0 6px 24px rgba(60,50,30,.10); }
-  .btn:hover { background: #fff; }
-  #msg { color: var(--muted); font-size: 12px; padding: 0 4px; }
-  #msg b { color: var(--hit); }
-  #stats { position: absolute; right: 12px; bottom: 12px; padding: 8px 12px; color: #5d5a53; font-size: 12px; text-align: right; }
-  #legend { position: absolute; left: 12px; bottom: 12px; padding: 8px 12px; display: flex; gap: 14px; flex-wrap: wrap;
-    font-size: 12px; color: #5d5a53; max-width: calc(100% - 330px); }
-  #legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px;
-    border: 1px solid rgba(0,0,0,.18); }
-  #info { position: absolute; right: 12px; top: 64px; width: 290px; max-height: calc(100% - 150px); overflow: auto;
-    padding: 10px 12px; display: none; }
-  #info h4 { margin: 0 0 2px; font-size: 13px; }
-  #info .sub { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-  #info .lv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-top: 1px solid var(--line); }
-  #info .lv .l { color: var(--muted); font-weight: 600; white-space: nowrap; font-size: 12px; }
-  #info .lv .p { text-align: right; }
-  #info .lv.m .p { color: var(--hit); font-weight: 700; }
-  #info .x { float: right; cursor: pointer; color: var(--muted); border: 0; background: none; font-size: 16px; line-height: 1; }
-  #tip { position: absolute; display: none; pointer-events: none; z-index: 5; max-width: 320px; padding: 8px 10px;
-    background: rgba(35,33,30,.94); color: #fff; border-radius: 9px; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-  #tip b { font-size: 13px; }
-  #tip .s { color: #cfcac0; }
-  #tip .li { margin-top: 2px; }
-  #tip .li.m { color: #8be0a5; font-weight: 700; }
-  #tip .w { margin-top: 3px; color: #ffb4a8; }
-  #tip .w.az { color: #9ec5ff; }
-  @media (max-width: 760px) { #info { display: none !important; } #legend { max-width: 100%; bottom: 52px; } }
-</style>
+<style>/*__UI_CSS__*/</style>
 </head>
 <body>
 <div id="wrap">
   <canvas id="gl"></canvas>
   <div id="top">
-    <div class="panel seg" id="chips"></div>
+    <div class="row"><div class="panel seg" id="chips"></div></div>
+    <div class="row">
     <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" placeholder="G7 E5 100 BAR7" autocomplete="off" style="width:130px"></div>
     <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
     <button class="btn" id="bBoneco" title="Quantos bonecos caminham pela loja">🚶 1</button>
     <span id="msg"></span>
+    </div>
   </div>
   <div id="info" class="panel"></div>
   <div id="legend" class="panel">
@@ -685,7 +634,8 @@ function frame(now) {
   for (const s of rotulos) {
     const d = camera.position.distanceTo(s.getWorldPosition(tmpV));
     const vis = d < s.userData.lod; if (s.visible !== vis) { s.visible = vis; dirty = true; }
-    const k = THREE.MathUtils.clamp(d * 0.034, 0.7, 2.4) * s.userData.base;
+    s.material.visible = window.__rotulosOn !== false;
+    const k = THREE.MathUtils.clamp(d * 0.03, 0.6, 2.2) * s.userData.base;
     if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2.4, 1); dirty = true; }
   }
   if (selGrupo.visible) { selFill.material.opacity = 0.28 + 0.14 * Math.sin(now / 280); dirty = true; }
@@ -701,6 +651,7 @@ $("stats").innerHTML = `Loja: <b>${nG}</b> gôndolas · <b>${nE}</b> estantes ·
 redimensionar(); pintar(); aplicarBonecos();
 requestAnimationFrame(frame);
 window.__geral = { state, lojaEstr, galpaoPos, barPal, D, camera, controls, irVista, selecionar, acharNumero, buscarProduto, scene };
+/*__UI_JS__*/
 </script>
 </body>
 </html>

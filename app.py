@@ -16,13 +16,37 @@ import streamlit.components.v1 as components
 
 import dados as dd
 
-ALTURA_MAPA = 700
+ALTURA_MAPA = 780
+UI_CSS = Path(__file__).with_name("ui.css")
+UI_JS = Path(__file__).with_name("ui.js")
 CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html"),
          "geral": Path(__file__).with_name("cena_geral.html")}
 
-st.set_page_config(page_title="Galpão CAMDA", page_icon="📦", layout="wide")
+st.set_page_config(page_title="CAMDA · Mapas 3D", page_icon="📦", layout="wide")
 st.markdown(
-    "<style>.block-container{padding-top:3rem;padding-bottom:1rem}</style>",
+    """
+<style>
+.block-container { padding: 2.4rem 1.4rem 1.2rem; max-width: 1500px; }
+footer, [data-testid="stDecoration"] { display: none; }
+header[data-testid="stHeader"] { background: transparent; }
+.brand { display: flex; align-items: center; gap: .75rem; }
+.brand .logo { width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(135deg, #f08a3c, #e87722);
+  color: #fff; display: grid; place-items: center; font-size: 1.25rem; box-shadow: 0 6px 16px rgba(232,119,34,.35); }
+.brand h1 { font-size: 1.35rem; line-height: 1.15; margin: 0; padding: 0; font-weight: 700; letter-spacing: -.01em; }
+.brand small { color: #8a877f; font-size: .78rem; }
+.stats { display: flex; flex-wrap: wrap; gap: .5rem; margin: .9rem 0 .8rem; }
+.stat { background: #fff; border: 1px solid #e3dfd5; border-radius: 999px; padding: .3rem .8rem; font-size: .84rem; color: #5d5a53;
+  box-shadow: 0 1px 2px rgba(60,50,30,.04); white-space: nowrap; }
+.stat b { color: #2b2a27; font-weight: 700; }
+.stat .d { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .45rem; vertical-align: .05rem; }
+.stat.demo { background: #fff4e8; border-color: #f3c89c; color: #a4570f; }
+.stat.hora { margin-left: auto; background: transparent; border-color: transparent; box-shadow: none; color: #8a877f; }
+iframe { border-radius: 18px; border: 1px solid #e3dfd5 !important; box-shadow: 0 14px 40px rgba(60,50,30,.14); background: #eeebe4; }
+[data-testid="stSegmentedControl"] button, [data-testid="stRadio"] label { font-weight: 600; }
+[data-testid="stAlert"] { border-radius: 14px; }
+@media (max-width: 760px) { .block-container { padding: 2.2rem .8rem 1rem; } .brand h1 { font-size: 1.15rem; } .stat.hora { margin-left: 0; } }
+</style>
+""",
     unsafe_allow_html=True,
 )
 
@@ -65,45 +89,71 @@ def cena_html(dados: dict, mapa: str) -> str:
         .replace(" ", "\\u2028")
         .replace(" ", "\\u2029")
     )
-    return CENAS[mapa].read_text(encoding="utf-8").replace("/*__DADOS__*/null", payload, 1)
+    html = CENAS[mapa].read_text(encoding="utf-8")
+    html = html.replace("/*__UI_CSS__*/", UI_CSS.read_text(encoding="utf-8"), 1)
+    html = html.replace("/*__UI_JS__*/", UI_JS.read_text(encoding="utf-8"), 1)
+    return html.replace("/*__DADOS__*/null", payload, 1)
 
 
 # ── Página ──────────────────────────────────────────────────────────────────
-c_titulo, c_mapa, c_btn = st.columns([2, 4, 1], vertical_alignment="center")
-c_titulo.subheader("CAMDA — mapas 3D")
-MAPAS = {"Galpão": "galpao", "Loja (gôndolas e estantes)": "loja", "Planta geral": "geral"}
-mapa = MAPAS[c_mapa.radio("Mapa", list(MAPAS), horizontal=True, label_visibility="collapsed")]
+MAPAS = {"Galpão": "galpao", "Loja": "loja", "Planta geral": "geral"}
+
+c_marca, c_mapa, c_btn = st.columns([3, 4, 1.2], vertical_alignment="center")
+c_marca.markdown(
+    '<div class="brand"><div class="logo">📦</div><div><h1>CAMDA · Mapas 3D</h1>'
+    "<small>Somente leitura · Quirinópolis-GO</small></div></div>",
+    unsafe_allow_html=True,
+)
+if hasattr(st, "segmented_control"):
+    escolha = c_mapa.segmented_control("Mapa", list(MAPAS), default="Galpão", label_visibility="collapsed") or "Galpão"
+else:
+    escolha = c_mapa.radio("Mapa", list(MAPAS), horizontal=True, label_visibility="collapsed")
+mapa = MAPAS[escolha]
 dados, hora, motivo = carregar(mapa)
 
 with c_btn:
-    if st.button("Atualizar", use_container_width=True):
+    if st.button("↻ Atualizar", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+
+
+def _stat(rotulo: str, valor: object, cor: str | None = None) -> str:
+    ponto = f'<span class="d" style="background:{cor}"></span>' if cor else ""
+    return f'<span class="stat">{ponto}<b>{valor}</b> {rotulo}</span>'
+
 
 if mapa == "galpao":
     pilhas = dados["pilhas"]
     total = len(dados["posicoes"])
-    ocupadas = len(pilhas)
-    racks = sum(len(p) for p in pilhas.values())
     falta = sum(1 for d in dados["divergencia"].values() if d["t"] == "falta")
     sobra = sum(1 for d in dados["divergencia"].values() if d["t"] == "sobra")
-    resumo = (
-        f"{ocupadas} de {total} posições com carga · {total - ocupadas} livres · {racks} racks · "
-        f"{falta} produtos com carga sem endereço · {sobra} endereçados além do sistema"
-    )
+    chips = [
+        _stat(f"de {total} posições com carga", len(pilhas)),
+        _stat("livres", total - len(pilhas)),
+        _stat("racks", sum(len(p) for p in pilhas.values())),
+        _stat("produtos com carga sem endereço", falta, "#e53935"),
+        _stat("endereçados além do sistema", sobra, "#1565C0"),
+    ]
 elif mapa == "geral":
     g_, l_, b_ = dados["galpao"], dados["loja"], dados["barracao"]
-    resumo = (
-        f"Loja: {len([i for i in l_['itens'] if i['kind'] != 'balcao'])} estruturas · "
-        f"Galpão: {len(g_['pilhas'])} de {len(g_['posicoes'])} posições com carga · "
-        f"Barracão: {sum(1 for p in b_['pal'] if p['c'].strip())} de {len(b_['pal'])} paletes com bag · "
-        f"{len(dados['catalogo'])} produtos"
-    )
+    chips = [
+        _stat("estruturas na loja", len([i for i in l_["itens"] if i["kind"] != "balcao"]), "#4caf50"),
+        _stat(f"de {len(g_['posicoes'])} posições no galpão", len(g_["pilhas"]), "#d8d4ca"),
+        _stat(f"de {len(b_['pal'])} paletes com bag no barracão", sum(1 for p in b_["pal"] if p["c"].strip()), "#c99d66"),
+        _stat("produtos", len(dados["catalogo"])),
+    ]
 else:
     itens = [i for i in dados["itens"] if i["kind"] != "balcao"]
-    com_produto = sum(1 for i in itens if i["prod"])
-    resumo = f"{len(itens)} estruturas no mapa · {com_produto} com produto endereçado · {len(dados['catalogo'])} produtos"
-st.caption(resumo + (f" · lido às {hora} (cache de 60 s)" if hora else ""))
+    chips = [
+        _stat("estruturas", len(itens), "#4caf50"),
+        _stat("com produto endereçado", sum(1 for i in itens if i["prod"])),
+        _stat("produtos", len(dados["catalogo"])),
+    ]
+if motivo:
+    chips.append('<span class="stat demo">dados de exemplo</span>')
+elif hora:
+    chips.append(f'<span class="stat hora">↻ lido às {hora} · cache de 60 s</span>')
+st.markdown('<div class="stats">' + "".join(chips) + "</div>", unsafe_allow_html=True)
 
 if motivo:
     st.warning(f"Mostrando DADOS DE EXEMPLO — {motivo}.", icon="⚠️")

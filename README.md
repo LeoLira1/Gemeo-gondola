@@ -45,6 +45,8 @@ Testes da lógica (opcional): `pip install pytest && pytest tests`.
 | `dados.py` | Cliente Turso (HTTP, só leitura), montagem do JSON, dados de exemplo |
 | `galpao.py` | Planta e regras de saldo/códigos vinculados do galpão (porte do Gondolas) |
 | `loja.py` | Planta da loja e produtos por estrutura (porte do Gondolas) |
+| `ui.css`, `ui.js` | Visual e controles compartilhados pelas três cenas (legenda recolhível, botão de rótulos) |
+| `.streamlit/config.toml` | Tema (cores) e barra de ferramentas do Streamlit |
 | `cena.html` | Cena Three.js do galpão |
 | `cena_loja.html` | Cena Three.js da loja |
 | `planta.py` | Onde cada prédio fica na planta geral e o barracão (porte do Gondolas) |
