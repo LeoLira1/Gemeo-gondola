@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>/*__UI_CSS__*/</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="gl"></canvas>
+  <div id="top">
+    <div class="row"><div class="panel chips" id="chips"></div></div>
+    <div class="row">
+      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" placeholder="BAR7" autocomplete="off"></div>
+      <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
+      <button class="btn" id="bVista" title="Voltar ao enquadramento inicial">⟲ Vista</button>
+      <button class="btn" id="bParede" title="Alternar entre as paredes reais (6 m) e uma vista em corte">Paredes</button>
+      <span id="msg"></span>
+    </div>
+  </div>
+  <div id="info" class="panel"></div>
+  <div id="legend" class="panel">
+    <span><i style="background:#c99d66"></i>Palete livre</span>
+    <span><i style="background:#e6dfcf"></i>Bag de 1000 kg</span>
+    <span><i style="background:#2e9e4f"></i>Produto buscado</span>
+    <span><i style="background:#e87722"></i>Portão</span>
+    <span><i style="background:#b9b4a8"></i>Porta</span>
+    <span><i style="background:transparent;border:2px solid #e87722"></i>Selecionado</span>
+  </div>
+  <div id="stats" class="panel"></div>
+  <div id="tip"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+"use strict";
+const D = /*__DADOS__*/null;
+
+const ORANGE = 0xe87722, GREEN = 0x2e9e4f;
+const C_PAREDE = 0xd2cdc2, C_VERGA = 0xbdb7aa, C_MADEIRA = 0xc99d66, C_BAG = 0xe6dfcf, C_FADE = 0xefece4;
+const W = D.w, DP = D.d, PH = D.h, E = D.esp;
+const state = { sel: null, matched: new Set(), fileira: 0, paredesAltas: true };
+const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+const $ = (id) => document.getElementById(id);
+const fold = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const normCod = (c) => (c || "").trim().toUpperCase();
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const isMatch = (c) => state.matched.size > 0 && state.matched.has(normCod(c));
+const wz = (z) => DP - z;                          // z local (0 = parede das aberturas) → mundo (a frente fica ao sul, perto da câmera)
+
+// ── Three.js ────────────────────────────────────────────────────────────────
+const canvas = $("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xeeebe4);
+const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 500);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.08; controls.maxPolarAngle = Math.PI * 0.47; controls.minDistance = 3; controls.maxDistance = 110;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xdcd6c9, 0.78));
+const sun = new THREE.DirectionalLight(0xffffff, 0.56);
+sun.castShadow = true; sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03;
+{ const SM = Math.min((navigator.maxTouchPoints || 0) > 0 ? 2048 : 4096, renderer.capabilities.maxTextureSize); sun.shadow.mapSize.set(SM, SM); }
+const R0 = Math.hypot(W, DP) / 2 + 3;
+sun.target.position.set(W / 2, 0, DP / 2); sun.position.set(W / 2 - 0.45 * R0, 1.5 * R0, DP / 2 + 0.7 * R0);
+Object.assign(sun.shadow.camera, { left: -R0, right: R0, top: R0, bottom: -R0, near: 1, far: 6 * R0 });
+sun.shadow.camera.updateProjectionMatrix();
+scene.add(sun, sun.target);
+
+const matCache = {};
+const getMat = (hex) => (matCache[hex] ||= new THREE.MeshStandardMaterial({ color: hex, roughness: 0.92, metalness: 0 }));
+const lerpHex = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t).getHex();
+const geoCache = {};
+const boxGeo = (w, h, d) => (geoCache[[w, h, d].map((v) => v.toFixed(4)).join()] ||= new THREE.BoxGeometry(w, h, d));
+const edgesGeo = (w, h, d) => (geoCache["e" + [w, h, d].map((v) => v.toFixed(4)).join()] ||= new THREE.EdgesGeometry(boxGeo(w, h, d)));
+function addBox(parent, x0, x1, y0, y1, z0, z1, color, sombra = true) {
+  const m = new THREE.Mesh(boxGeo(x1 - x0, y1 - y0, z1 - z0), getMat(color));
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); m.castShadow = sombra; m.receiveShadow = true; parent.add(m); return m;
+}
+
+// ── Chão ────────────────────────────────────────────────────────────────────
+const laje = new THREE.Mesh(new THREE.BoxGeometry(W + 12, 0.2, DP + 12), getMat(0xf8f6f1));
+laje.position.set(W / 2, -0.101, DP / 2); laje.receiveShadow = true; scene.add(laje);
+{ // piso do salão com grade de 1 m (a escala do barracão)
+  const nx = Math.round(W - 2 * E), nz = Math.round(DP - 2 * E);
+  const c = document.createElement("canvas"); c.width = nx * 48; c.height = nz * 48;
+  const g = c.getContext("2d"); g.fillStyle = "#dedbd3"; g.fillRect(0, 0, c.width, c.height);
+  g.strokeStyle = "rgba(0,0,0,.08)"; g.lineWidth = 2;
+  for (let i = 0; i <= nx; i++) { g.beginPath(); g.moveTo(i * 48, 0); g.lineTo(i * 48, c.height); g.stroke(); }
+  for (let j = 0; j <= nz; j++) { g.beginPath(); g.moveTo(0, j * 48); g.lineTo(c.width, j * 48); g.stroke(); }
+  const tex = new THREE.CanvasTexture(c); tex.anisotropy = 4;
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(W - 2 * E, DP - 2 * E), new THREE.MeshStandardMaterial({ map: tex, roughness: 1 }));
+  piso.rotation.x = -Math.PI / 2; piso.position.set(W / 2, 0.003, DP / 2); piso.receiveShadow = true; scene.add(piso);
+}
+function textoNoChao(txt, x, z, larg, cor) {
+  const c = document.createElement("canvas"); c.width = 1024; c.height = 128;
+  const g = c.getContext("2d"); g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = cor;
+  let px = 76; do { g.font = `700 ${px}px system-ui, Segoe UI, Arial, sans-serif`; if (g.letterSpacing !== undefined) g.letterSpacing = px / 10 + "px"; px -= 4; } while (g.measureText(txt).width > 980 && px > 20);
+  g.fillText(txt, 512, 66);
+  const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(larg, larg * 128 / 1024), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, 0.012, z); m.renderOrder = 2; scene.add(m); return m;
+}
+// marcas das aberturas no piso e rótulos do lado de fora
+for (const a of D.aberturas) {
+  const portao = a.tipo === "PORTÃO", cx = (a.x0 + a.x1) / 2;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(a.x1 - a.x0, E + 0.6), new THREE.MeshBasicMaterial({ color: portao ? ORANGE : 0xb9b4a8, transparent: true, opacity: 0.6 }));
+  m.rotation.x = -Math.PI / 2; m.position.set(cx, 0.02, DP + 0.1 - E / 2 + 0.3); scene.add(m);
+  textoNoChao(`${a.tipo} · ${fmt.format(a.x1 - a.x0)} × ${fmt.format(a.h)} m`, cx, DP + 1.6, Math.max(a.x1 - a.x0, 3.4) + 1.6, portao ? "rgba(190,90,20,.9)" : "rgba(90,86,78,.8)");
+}
+textoNoChao("BARRACÃO · 35 × 10 m", W / 2, -1.7, 12, "rgba(21,24,28,.6)");
+
+// ── Paredes (reais, de 6 m, ou em corte) ────────────────────────────────────
+const paredes = new THREE.Group(); scene.add(paredes);
+function montarParedes() {
+  paredes.clear();
+  const H = state.paredesAltas ? PH : 1.3;
+  addBox(paredes, 0, W, 0, H, 0, E, C_PAREDE);                                   // fundo (norte)
+  addBox(paredes, 0, E, 0, H, E, DP - E, C_PAREDE); addBox(paredes, W - E, W, 0, H, E, DP - E, C_PAREDE);   // laterais
+  let x = 0;                                                                     // frente: panos entre as aberturas
+  for (const a of D.aberturas.concat([{ x0: W, x1: W, h: 0 }])) {
+    if (a.x0 > x) addBox(paredes, x, a.x0, 0, H, DP - E, DP, C_PAREDE);
+    x = a.x1;
+  }
+  for (const a of D.aberturas) if (H > a.h) addBox(paredes, a.x0, a.x1, a.h, H, DP - E, DP, C_VERGA);   // verga acima do vão
+  dirty = true;
+}
+
+// ── Paletes e bags ──────────────────────────────────────────────────────────
+const pal = [];
+const matVaga = new THREE.MeshBasicMaterial({ color: 0xcfcbc1, transparent: true, opacity: 0.4, depthWrite: false });
+const rotulos = [];
+const texCache = {};
+function labelTex(txt, estilo) {
+  const k = txt + "|" + estilo;
+  return (texCache[k] ||= (() => {
+    const c = document.createElement("canvas"); c.width = 192; c.height = 80;
+    const g = c.getContext("2d");
+    const cores = { n: ["rgba(255,255,255,.93)", "#2b2a27", "#d4d0c6"], h: ["#2e9e4f", "#fff", "#2e9e4f"], s: ["#e87722", "#fff", "#e87722"] }[estilo];
+    g.fillStyle = cores[0]; g.strokeStyle = cores[2]; g.lineWidth = 3;
+    g.beginPath(); g.roundRect ? g.roundRect(6, 8, 180, 64, 22) : g.rect(6, 8, 180, 64); g.fill(); g.stroke();
+    g.fillStyle = cores[1]; g.font = "bold 40px system-ui, Segoe UI, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(txt, 96, 42);
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  })());
+}
+for (const p of D.pal) {
+  const x = p.x, z = wz(p.z), ocupado = !!p.c.trim();
+  const e = { p, x, z, w: D.palete.x, d: D.palete.z, h: D.palete.h + (ocupado ? D.bag.h : 0), ocupado, matched: false, bag: null, hit: null, label: null };
+  addBox(scene, x - D.palete.x / 2, x + D.palete.x / 2, 0, D.palete.h, z - D.palete.z / 2, z + D.palete.z / 2, C_MADEIRA);
+  if (ocupado) {
+    e.bag = addBox(scene, x - D.bag.x / 2, x + D.bag.x / 2, D.palete.h, D.palete.h + D.bag.h, z - D.bag.z / 2, z + D.bag.z / 2, C_BAG);
+    e.bag.add(new THREE.LineSegments(edgesGeo(D.bag.x, D.bag.h, D.bag.z), new THREE.LineBasicMaterial({ color: 0xc8c1b0 })));
+    e.bag.userData.alvo = e; e.hit = e.bag;
+  } else {
+    const t = new THREE.Mesh(new THREE.PlaneGeometry(D.palete.x, D.palete.z), matVaga);
+    t.rotation.x = -Math.PI / 2; t.position.set(x, D.palete.h + 0.005, z); t.userData.alvo = e; scene.add(t); e.hit = t;
+  }
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(p.rot.replace("BAR-", ""), "n"), transparent: true, depthTest: false }));
+  s.renderOrder = 10; s.position.set(x, e.h + 0.45, z); s.userData = { base: 0.8, lod: 70, txt: p.rot.replace("BAR-", "") }; scene.add(s); rotulos.push(s); e.label = s;
+  pal.push(e);
+}
+const hits = pal.map((e) => e.hit);
+function setRotulo(s, estilo) { s.material.map = labelTex(s.userData.txt, estilo); s.material.needsUpdate = true; }
+
+// seleção e hover
+const selGrupo = new THREE.Group();
+const selFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.35, depthWrite: false }));
+selFill.rotation.x = -Math.PI / 2; selFill.position.y = 0.02;
+const selBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: ORANGE }));
+selGrupo.add(selFill, selBox); selGrupo.visible = false; scene.add(selGrupo);
+const hoverBox = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: 0x2b2a27 }));
+hoverBox.visible = false; scene.add(hoverBox);
+
+function pintar() {
+  for (const e of pal) {
+    e.matched = e.ocupado && isMatch(e.p.c);
+    const fade = state.fileira && e.p.f !== state.fileira;
+    if (e.bag) e.bag.material = getMat(e.matched ? GREEN : fade ? lerpHex(C_BAG, C_FADE, 0.7) : C_BAG);
+    setRotulo(e.label, state.sel === e ? "s" : e.matched ? "h" : "n");
+    e.label.userData.fade = !!fade;
+  }
+  dirty = true;
+}
+
+// ── Câmera (de frente para a parede das aberturas, bem de cima) ─────────────
+const DIR = new THREE.Vector3(0.12, 1.05, 0.5).normalize();
+let tween = null;
+function voarPara(alvo, pos, dur = 700) { tween = { t0: performance.now(), dur, p0: camera.position.clone(), t_0: controls.target.clone(), p1: pos, t1: alvo }; }
+const _cam = new THREE.PerspectiveCamera();
+const FAIXA = { xMax: 0.95, yMax: 0.62, yMin: -0.8 };
+function projetar(alvo, dist, cantos) {
+  _cam.fov = camera.fov; _cam.aspect = camera.aspect; _cam.near = 0.1; _cam.far = 2000; _cam.updateProjectionMatrix();
+  _cam.position.copy(alvo).addScaledVector(DIR, dist); _cam.lookAt(alvo); _cam.updateMatrixWorld(); _cam.matrixWorldInverse.copy(_cam.matrixWorld).invert();
+  let x = 0, yMin = 1e9, yMax = -1e9;
+  for (const c of cantos) { const v = c.clone().project(_cam); x = Math.max(x, Math.abs(v.x)); yMin = Math.min(yMin, v.y); yMax = Math.max(yMax, v.y); }
+  return { x, yMin, yMax };
+}
+function enquadrar(r, h, animar = true) {
+  const cantos = [];
+  for (const x of [r.x0, r.x1]) for (const z of [r.z0, r.z1]) for (const y of [0, h]) cantos.push(new THREE.Vector3(x, y, z));
+  const alvo = new THREE.Vector3((r.x0 + r.x1) / 2, 0.3, (r.z0 + r.z1) / 2);
+  const frente = new THREE.Vector3(-DIR.x, 0, -DIR.z).normalize(), tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  let dist = 30;
+  for (let it = 0; it < 4; it++) {
+    let lo = 4, hi = 300;
+    for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2, q = projetar(alvo, mid, cantos); if (q.x <= FAIXA.xMax && q.yMax <= FAIXA.yMax && q.yMin >= FAIXA.yMin) hi = mid; else lo = mid; }
+    dist = hi;
+    const q = projetar(alvo, dist, cantos);
+    alvo.addScaledVector(frente, -(((FAIXA.yMax + FAIXA.yMin) / 2) - (q.yMax + q.yMin) / 2) * dist * tanV / DIR.y);
+  }
+  const pos = alvo.clone().addScaledVector(DIR, dist);
+  if (animar) voarPara(alvo, pos); else { camera.position.copy(pos); controls.target.copy(alvo); controls.update(); }
+  dirty = true;
+}
+const alturaVista = () => (state.paredesAltas ? PH : 2.2);
+const vistaTudo = (animar = true) => enquadrar({ x0: 0, x1: W, z0: 0, z1: DP }, alturaVista(), animar);
+$("bVista").onclick = () => { state.fileira = 0; marcarChips(); pintar(); vistaTudo(); };
+$("bParede").onclick = () => { state.paredesAltas = !state.paredesAltas; $("bParede").classList.toggle("off", !state.paredesAltas); $("bParede").textContent = state.paredesAltas ? "Paredes: reais" : "Paredes: em corte"; montarParedes(); };
+
+// ── Chips de fileira ────────────────────────────────────────────────────────
+function marcarChips() { document.querySelectorAll("#chips .chip").forEach((b) => b.classList.toggle("on", +b.dataset.f === state.fileira)); }
+function marcarPontos() {
+  const tem = new Set(pal.filter((e) => e.matched).map((e) => e.p.f));
+  document.querySelectorAll("#chips .chip").forEach((b) => b.classList.toggle("has", +b.dataset.f > 0 && tem.has(+b.dataset.f)));
+}
+function irFileira(f) {
+  state.fileira = f; marcarChips(); pintar();
+  if (!f) { vistaTudo(); return; }
+  const es = pal.filter((e) => e.p.f === f), z0 = Math.min(...es.map((e) => e.z)) - 1.2, z1 = Math.max(...es.map((e) => e.z)) + 1.2;
+  enquadrar({ x0: 0, x1: W, z0, z1 }, 2.2);
+}
+{
+  const mk = (txt, f) => { const b = document.createElement("button"); b.className = "chip"; b.dataset.f = f; b.innerHTML = `${txt}<span class="dot"></span>`; b.onclick = () => irFileira(f); $("chips").appendChild(b); };
+  mk("Todas", 0);
+  for (let f = 1; f <= D.fileiras; f++) mk(`Fileira ${f}`, f);
+  marcarChips();
+}
+
+// ── Cartão e tooltip ────────────────────────────────────────────────────────
+function descrever(e) {
+  const p = e.p;
+  return { titulo: `${p.rot} · Palete com bag`, sub: `Fileira ${p.f}` + (e.ocupado ? "" : " · palete livre"),
+    linhas: e.ocupado ? [{ l: "Bag", p: p.n || p.c, q: p.q, m: isMatch(p.c), cod: p.c }] : [] };
+}
+function mostrarCartao(e) {
+  const d = descrever(e), el = $("info");
+  el.innerHTML = `<button class="x" title="Fechar">×</button><h4>${esc(d.titulo)}</h4><div class="sub">${esc(d.sub)}</div>` +
+    d.linhas.map((x) => `<div class="lv${x.m ? " m" : ""}"><span class="l">${esc(x.l)}</span><span class="p">${esc(x.p)}<br>Cód. ${esc(x.cod)} · <b>${x.q == null ? "—" : fmt.format(x.q) + " un"}</b></span></div>`).join("");
+  el.style.display = "block"; el.querySelector(".x").onclick = limparSelecao;
+}
+function limparSelecao() { state.sel = null; selGrupo.visible = false; $("info").style.display = "none"; $("qNum").value = ""; pintar(); }
+function selecionar(e, voar) {
+  if (!e) { limparSelecao(); return; }
+  state.sel = e;
+  const h = Math.max(e.h, 0.4);
+  selFill.scale.set(e.w + 0.3, e.d + 0.3, 1); selBox.scale.set(e.w + 0.12, h, e.d + 0.12); selBox.position.y = h / 2;
+  selGrupo.position.set(e.x, 0, e.z); selGrupo.visible = true;
+  mostrarCartao(e); pintar();
+  if (voar) { const alvo = new THREE.Vector3(e.x, 0.6, e.z); voarPara(alvo, alvo.clone().addScaledVector(DIR, 9)); }
+}
+
+// ── Buscas ──────────────────────────────────────────────────────────────────
+let tNum = null;
+const acharNumero = (txt) => { const m = /^(?:b(?:ar)?-?)?(\d{1,3})$/i.exec(txt.trim().replace(/\s+/g, "")); return m ? pal.find((e) => e.p.rot === "BAR-" + String(+m[1]).padStart(2, "0")) : null; };
+const irNumero = () => { const v = $("qNum").value.trim(); if (!v) { limparSelecao(); return; } const e = acharNumero(v); if (e) selecionar(e, true); };
+$("qNum").addEventListener("input", () => { clearTimeout(tNum); tNum = setTimeout(irNumero, 400); });
+$("qNum").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { clearTimeout(tNum); irNumero(); } });
+
+const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, k: fold(p.n) + " " + fold(p.c) }));
+let tProd = null;
+$("qProd").addEventListener("input", () => { clearTimeout(tProd); tProd = setTimeout(buscarProduto, 220); });
+function buscarProduto() {
+  const q = fold($("qProd").value).trim(), termos = q.length >= 2 ? q.split(/\s+/) : [];
+  const achados = termos.length ? catalogo.filter((p) => termos.every((t) => p.k.includes(t))) : [];
+  state.matched = new Set(achados.map((p) => normCod(p.c)));
+  pintar(); marcarPontos();
+  const n = pal.filter((e) => e.matched).length, un = pal.filter((e) => e.matched).reduce((s, e) => s + (e.p.q || 0), 0);
+  $("msg").innerHTML = !termos.length ? "" : !achados.length ? "nenhum produto no barracão"
+    : `<b>${achados.length}</b> produto${achados.length > 1 ? "s" : ""} · <b>${n}</b> palete${n === 1 ? "" : "s"} · ${fmt.format(un)} un`;
+  if (state.sel) mostrarCartao(state.sel);
+}
+
+// ── Hover e clique ──────────────────────────────────────────────────────────
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(), tip = $("tip");
+let ultimoMouse = null, arrastando = false, moveu = false, down = null;
+canvas.addEventListener("pointermove", (ev) => {
+  const rc = canvas.getBoundingClientRect(); ultimoMouse = { x: ev.clientX - rc.left, y: ev.clientY - rc.top };
+  mouse.set((ultimoMouse.x / rc.width) * 2 - 1, -(ultimoMouse.y / rc.height) * 2 + 1);
+  if (down && Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 4) moveu = true;
+  verHover();
+});
+canvas.addEventListener("pointerleave", () => { tip.style.display = "none"; hoverBox.visible = false; dirty = true; });
+canvas.addEventListener("pointerdown", (ev) => { arrastando = true; down = [ev.clientX, ev.clientY]; moveu = false; tip.style.display = "none"; });
+window.addEventListener("pointerup", () => { arrastando = false; });
+function acharAlvo() { ray.setFromCamera(mouse, camera); const h = ray.intersectObjects(hits, false)[0]; return h ? h.object.userData.alvo : null; }
+function verHover() {
+  if (arrastando) return;
+  const e = acharAlvo();
+  if (!e) { tip.style.display = "none"; hoverBox.visible = false; canvas.style.cursor = ""; dirty = true; return; }
+  canvas.style.cursor = "pointer";
+  const d = descrever(e); tip.textContent = "";
+  const add = (tag, txt, cls) => { const el = document.createElement(tag); el.textContent = txt; if (cls) el.className = cls; tip.appendChild(el); };
+  add("b", d.titulo); add("div", d.sub, "s");
+  for (const x of d.linhas) add("div", `${x.p} — ${x.q == null ? "—" : fmt.format(x.q) + " un"}`, "li" + (x.m ? " m" : ""));
+  const h = Math.max(e.h, 0.2);
+  hoverBox.scale.set(e.w + 0.08, h + 0.04, e.d + 0.08); hoverBox.position.set(e.x, h / 2, e.z); hoverBox.visible = true;
+  tip.style.display = "block";
+  const Wd = $("wrap").clientWidth;
+  tip.style.left = Math.min(ultimoMouse.x + 16, Wd - tip.offsetWidth - 8) + "px"; tip.style.top = Math.max(ultimoMouse.y - tip.offsetHeight - 12, 6) + "px";
+  dirty = true;
+}
+canvas.addEventListener("click", () => { if (moveu) return; const e = acharAlvo(); if (e) { $("qNum").value = e.p.rot; selecionar(e, false); } });
+
+// ── Loop ────────────────────────────────────────────────────────────────────
+let dirty = true, primeiro = true;
+controls.addEventListener("change", () => { dirty = true; });
+function redimensionar() {
+  const w = $("wrap").clientWidth, h = $("wrap").clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  if (primeiro) { primeiro = false; vistaTudo(false); }
+  dirty = true;
+}
+new ResizeObserver(redimensionar).observe($("wrap"));
+const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const tmpV = new THREE.Vector3();
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (tween) {
+    const k = Math.min((now - tween.t0) / tween.dur, 1), e = ease(k);
+    camera.position.lerpVectors(tween.p0, tween.p1, e); controls.target.lerpVectors(tween.t_0, tween.t1, e);
+    if (k >= 1) tween = null; dirty = true;
+  }
+  for (const s of rotulos) {
+    const d = camera.position.distanceTo(s.getWorldPosition(tmpV));
+    s.material.visible = window.__rotulosOn !== false && !s.userData.fade;
+    const vis = d < s.userData.lod; if (s.visible !== vis) { s.visible = vis; dirty = true; }
+    const k = THREE.MathUtils.clamp(d * 0.03, 0.55, 1.4) * s.userData.base;
+    if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2.4, 1); dirty = true; }
+  }
+  if (selGrupo.visible) { selFill.material.opacity = 0.28 + 0.14 * Math.sin(now / 280); dirty = true; }
+  if (controls.update()) dirty = true;
+  if (!dirty) return;
+  dirty = false; renderer.render(scene, camera);
+}
+
+// ── Início ──────────────────────────────────────────────────────────────────
+const ocup = pal.filter((e) => e.ocupado).length, un = pal.reduce((s, e) => s + (e.ocupado ? e.p.q || 0 : 0), 0);
+$("stats").innerHTML = `<b>${ocup}</b> de ${pal.length} paletes com bag · <b>${fmt.format(un)}</b> un · corredor de manobra de <b>${fmt.format(D.corredor)} m</b>`;
+$("bParede").textContent = "Paredes: reais";
+montarParedes(); redimensionar(); pintar();
+requestAnimationFrame(frame);
+/*__UI_JS__*/
+window.__barracao = { state, pal, D, camera, controls, selecionar, buscarProduto, irFileira, scene };
+</script>
+</body>
+</html>

@@ -11,6 +11,9 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   expositores MagnoJet/Nellore/Monitor, Estante Parede, balcão e os bonecos que caminham pelos corredores.
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
   Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
+- **Barracão:** a estrutura de 35 × 10 m (paredes de 6 m, porta, portão e porta na parede da frente) com os paletes
+  e bags de `barracao_enderecos` (BAR-01 … BAR-100). Chips por fileira, busca por `BAR7` e por produto, e botão
+  para alternar paredes reais / em corte. Sem linhas na tabela, mostra o layout padrão do Gondolas, todo livre.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.
 - Quantidades em **unidades**, sem conversão.
@@ -43,5 +46,7 @@ Testes da lógica (opcional): `pip install pytest && pytest tests`.
 | `loja.py` | Planta da loja e produtos por estrutura (porte do Gondolas) |
 | `ui.css`, `ui.js` | Visual e controles compartilhados pelas cenas (legenda recolhível, botão de rótulos) |
 | `.streamlit/config.toml` | Tema (cores) e barra de ferramentas do Streamlit |
+| `barracao.py` | Medidas e endereços do barracão (porte do Gondolas) |
+| `cena_barracao.html` | Cena Three.js do barracão |
 | `cena.html` | Cena Three.js do galpão |
 | `cena_loja.html` | Cena Three.js da loja |
