@@ -1,0 +1,78 @@
+/* Estilo compartilhado das três cenas (galpão, loja e planta geral). Injetado por app.py. */
+:root { --bg: #eeebe4; --panel: rgba(255,255,255,.92); --ink: #2b2a27; --muted: #8a877f; --line: #ddd9ce;
+  --accent: #e87722; --hit: #2e9e4f; --sombra: 0 8px 28px rgba(60,50,30,.12); }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; color: var(--ink);
+  font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+#wrap { position: relative; width: 100%; height: 100%;
+  background: radial-gradient(1200px 700px at 50% 30%, #f7f5ef 0%, var(--bg) 70%); }
+#gl { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sombra);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
+/* barra de cima */
+#top { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+#top > *, #top .row > * { pointer-events: auto; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg, .chips { display: inline-flex; flex-wrap: wrap; padding: 4px; gap: 4px; }
+.seg button, .chip { border: 0; background: transparent; padding: 8px 14px; border-radius: 10px; cursor: pointer; position: relative;
+  font: inherit; font-weight: 600; color: #6a665d; min-height: 36px; transition: background .15s, color .15s; }
+.seg button small { font-weight: 500; opacity: .75; margin-left: 5px; }
+.seg button:hover, .chip:hover { background: rgba(0,0,0,.05); }
+.seg button.on { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(232,119,34,.35); }
+.chip.on { background: var(--ink); color: #fff; }
+.chip { padding: 6px 12px; min-height: 32px; }
+.dot { position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--hit);
+  box-shadow: 0 0 0 2px #fff; display: none; }
+.has > .dot { display: block; }
+.field { display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 44px; transition: box-shadow .15s, border-color .15s; }
+.field label { color: var(--muted); font-weight: 700; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.field input { border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); width: 170px; padding: 8px 0; }
+.field input.num { width: 84px; }
+.field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,119,34,.22), var(--sombra); }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 0 14px; min-height: 44px; cursor: pointer;
+  font: inherit; font-weight: 600; color: #5d5a53; box-shadow: var(--sombra); backdrop-filter: blur(8px); transition: background .15s, color .15s; }
+.btn:hover { background: #fff; }
+.btn.off { color: var(--muted); background: rgba(255,255,255,.6); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
+#msg { color: var(--muted); font-size: 12px; padding: 0 4px; }
+#msg b { color: var(--hit); }
+
+/* rodapé: legenda recolhível + resumo */
+#legend { position: absolute; left: 12px; bottom: 64px; padding: 10px 14px; display: flex; gap: 8px 16px; flex-wrap: wrap;
+  font-size: 12px; color: #5d5a53; max-width: calc(100% - 24px); }
+#legend.fechada { display: none; }
+#legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 6px; vertical-align: -2px; border: 1px solid rgba(0,0,0,.18); }
+#bLeg { position: absolute; left: 12px; bottom: 12px; }
+#bLeg.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+#stats { position: absolute; right: 12px; bottom: 12px; padding: 10px 14px; color: #5d5a53; font-size: 12px; text-align: right; max-width: calc(100% - 140px); }
+#stats b { color: var(--ink); }
+
+/* cartão e dica */
+#info { position: absolute; right: 12px; top: 112px; width: 300px; max-width: calc(100% - 24px); max-height: calc(100% - 200px);
+  overflow: auto; padding: 12px 14px; display: none; }
+#info h4 { margin: 0 0 2px; font-size: 14px; padding-right: 22px; }
+#info .sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+#info .lv { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-top: 1px solid var(--line); }
+#info .lv .l { color: var(--muted); font-weight: 600; white-space: nowrap; font-size: 12px; }
+#info .lv .p { text-align: right; }
+#info .lv.m .p { color: var(--hit); font-weight: 700; }
+#info .x { position: absolute; right: 10px; top: 8px; cursor: pointer; color: var(--muted); border: 0; background: none; font-size: 20px; line-height: 1; padding: 4px; }
+#tip { position: absolute; display: none; pointer-events: none; z-index: 5; max-width: 330px; padding: 10px 12px;
+  background: rgba(35,33,30,.95); color: #fff; border-radius: 12px; font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.28); }
+#tip b { font-size: 13px; }
+#tip .s { color: #cfcac0; }
+#tip .li { margin-top: 3px; }
+#tip .li.m { color: #8be0a5; font-weight: 700; }
+#tip .q { color: #ffc98a; font-weight: 700; }
+#tip .w { margin-top: 4px; color: #ffb4a8; }
+#tip .w.az { color: #9ec5ff; }
+
+/* tablet / celular: controles maiores, cartão vira gaveta embaixo */
+@media (max-width: 900px) {
+  .field { flex: 1 1 150px; } .field input { width: 100%; } .field input.num { width: 100%; }
+  #stats { display: none; }
+}
+@media (max-width: 760px) {
+  #info { top: auto; bottom: 64px; right: 12px; left: 12px; width: auto; max-height: 38%; }
+  #legend { bottom: 64px; }
+}
