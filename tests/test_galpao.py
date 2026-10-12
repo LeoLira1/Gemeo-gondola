@@ -216,7 +216,7 @@ def test_indice_global_junta_os_tres_mapas():
 def test_ler_tudo_isola_o_mapa_que_falha(monkeypatch):
     import dados as ddg
     # galpão sem leitura (racks None) → só ele vira exemplo; os outros seguem
-    res = [None, None, None, None, None, None, [], [], [], []]
+    res = [None, None, None, None, None, None, [], [], [], [], []]
     monkeypatch.setattr(ddg, "consultar", lambda url, token, sqls: res)
     t = ddg.ler_tudo("http://x", "t")
     assert "galpao" in t["erros"] and "loja" not in t["erros"]

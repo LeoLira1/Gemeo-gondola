@@ -15,6 +15,7 @@ import requests
 import galpao as g
 import barracao as br
 import loja as lj
+import estocados as es
 
 TIMEOUT_S = 20
 
@@ -115,6 +116,7 @@ def montar(
                 "c": r.get("produto_codigo") or "",
                 "nome": r.get("produto_nome") or "",
                 "q": _num(r.get("quantidade")),
+                "e": es.codigo_eh_estocado(r.get("produto_codigo")),
             }
         )
 
@@ -133,7 +135,8 @@ def montar(
         if c is not None:
             enderecado[c] = _num(e.get("enderecado"))
 
-    codigos_com_rack = {r["c"] for pilha in pilhas.values() for r in pilha if r["c"].strip()}
+    # "EST:" (material de cooperado) fica FORA do saldo: não entra em grupos, saldos nem divergência.
+    codigos_com_rack = {r["c"] for pilha in pilhas.values() for r in pilha if r["c"].strip() and not r["e"]}
     grupos = g.grupos_de_codigos(codigos_com_rack, vinculos, nome_mestre)
     saldos = g.montar_saldos(codigos_com_rack, grupos, sistema, enderecado)
 
@@ -143,7 +146,7 @@ def montar(
         for r in pilha:
             if not r["c"].strip():
                 continue
-            nome = nome_mestre.get(g.normalizar_codigo(r["c"]) or "") or r["nome"]
+            nome = r["nome"] if r["e"] else (nome_mestre.get(g.normalizar_codigo(r["c"]) or "") or r["nome"])
             catalogo.setdefault(r["c"], nome)
             if not r["nome"]:
                 r["nome"] = nome
@@ -253,6 +256,24 @@ _PRODUTOS_DEMO = [
 ]
 
 
+_TERCEIROS_DEMO = [
+    {"razao_social": "MARIA SOUZA", "descricao": "ADUBO FOLIAR NUTRI-K 20L", "codigo": "410077", "armazem": "01", "saldo": "12"},
+    {"razao_social": "JOAO SILVA", "descricao": "HERBICIDA BORAL 500 SC 20L", "codigo": "254185", "armazem": "01", "saldo": "30"},
+    {"razao_social": "JOÃO SILVA", "descricao": "FUNGICIDA OPERA ULTRA 5L", "codigo": "300112", "armazem": "02", "saldo": "8"},
+    {"razao_social": "FAZENDA BOA VISTA", "descricao": "SAL MINERAL BOVINO 25KG", "codigo": "", "armazem": "01", "saldo": "40"},
+]
+
+
+def _estocados_demo_racks(racks: list[dict[str, Any]]) -> None:
+    """Dois paletes de estocado em vagas livres do galpão de exemplo (um com 2 níveis)."""
+    ocupadas = {r["posicao"] for r in racks}
+    livres = [p.numero for p in g.POSICOES if p.numero not in ocupadas][:2]
+    for pos, linha in zip(livres, _TERCEIROS_DEMO[:2]):
+        i = es.item_de_linha(linha)
+        racks.append({"posicao": pos, "ordem": 1, "produto_codigo": i.codigo_do_palete,
+                      "produto_nome": i.nome_do_palete, "quantidade": i.saldo})
+
+
 def dados_exemplo() -> dict[str, Any]:
     """Galpão fictício, determinístico, só para ver o mapa sem o banco."""
     rnd = random.Random(129)
@@ -266,8 +287,11 @@ def dados_exemplo() -> dict[str, Any]:
                 {"posicao": p.numero, "ordem": ordem, "produto_codigo": cod,
                  "produto_nome": nome, "quantidade": rnd.choice([20, 24, 30, 40, 48, 60, 90])}
             )
+    _estocados_demo_racks(racks)
     totais: dict[str, float] = {}
     for r in racks:
+        if es.codigo_eh_estocado(r["produto_codigo"]):
+            continue  # fora do saldo
         totais[r["produto_codigo"]] = totais.get(r["produto_codigo"], 0) + r["quantidade"]
     mestre = []
     for cod, nome in _PRODUTOS_DEMO:
@@ -364,6 +388,11 @@ def barracao_exemplo() -> dict[str, Any]:
         cod, nome = ("", "") if rnd.random() < 0.3 else rnd.choice(_PRODUTOS_DEMO)
         linhas.append({"id": i + 1, "rotulo": p["rot"], "pos_x": p["x"], "pos_z": p["z"],
                        "produto_codigo": cod, "produto_nome": nome, "quantidade": rnd.choice([1, 1, 2, 4]) if cod else 0})
+    i = es.item_de_linha(_TERCEIROS_DEMO[2])  # um estocado no primeiro palete livre
+    for l in linhas:
+        if not l["produto_codigo"]:
+            l.update(produto_codigo=i.codigo_do_palete, produto_nome=i.nome_do_palete, quantidade=i.saldo)
+            break
     return br.montar(linhas)
 
 
@@ -390,28 +419,43 @@ def indice_global(galpao: dict[str, Any], loja: dict[str, Any], barracao: dict[s
     return out
 
 
+def estocados_da_cena(linhas, galpao: dict[str, Any], barracao: dict[str, Any]) -> dict[str, Any]:
+    """Lista de materiais_terceiros + endereço de cada item (liga o palete pelo nome "PRODUTO · COOPERADO")."""
+    racks = [(int(n), r) for n, pilha in galpao["pilhas"].items() for r in pilha]
+    return es.para_cena(linhas, racks, barracao["pal"])
+
+
+def resumo_galpao(galpao: dict[str, Any]) -> str:
+    """"38 livres · 30 estocados · 61 loja"; vagas = posições × níveis (129 × 4 = 516)."""
+    total = len(galpao["posicoes"]) * galpao["geo"]["niveisMax"]
+    return es.resumo_ocupacao(total, (r["c"] for pilha in galpao["pilhas"].values() for r in pilha))
+
+
 def ler_tudo(url: str, token: str) -> dict[str, Any]:
     """Galpão, loja e barracão numa ida só ao Turso. Um mapa que falha vira dados de exemplo
     (anotado em `erros`), sem derrubar os outros."""
     res = consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO,
-                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO])
+                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO, es.SQL_ESTOCADOS])
     erros: dict[str, str] = {}
     try:
         galpao = _montar_galpao_de(*res[:6])
     except TursoErro as e:
         galpao, erros["galpao"] = dados_exemplo(), str(e)
-    gond, est, qtd, barr = res[6:]
+    gond, est, qtd, barr, terc = res[6:]
     if gond is None or est is None:
         loja, erros["loja"] = loja_exemplo(), "não consegui ler gondola_layout / estante_layout"
     else:
         loja = lj.montar(gond, est, qtd or [])
         loja["avisos"] = [] if qtd is not None else ["estoque_localizado não pôde ser lida; as quantidades da loja não aparecem."]
     barracao = br.montar(barr)
-    return {"galpao": galpao, "loja": loja, "barracao": barracao, "erros": erros}
+    return {"galpao": galpao, "loja": loja, "barracao": barracao, "erros": erros,
+            "estocados": estocados_da_cena(terc, galpao, barracao)}
 
 
 def tudo_exemplo() -> dict[str, Any]:
-    return {"galpao": dados_exemplo(), "loja": loja_exemplo(), "barracao": barracao_exemplo(), "erros": {}}
+    galpao, barracao = dados_exemplo(), barracao_exemplo()
+    return {"galpao": galpao, "loja": loja_exemplo(), "barracao": barracao, "erros": {},
+            "estocados": estocados_da_cena(_TERCEIROS_DEMO, galpao, barracao)}
 
 
 # ── Ocupação em porcentagem (indicadores do topo da página) ─────────────────
