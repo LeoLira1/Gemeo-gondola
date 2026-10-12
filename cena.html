@@ -50,6 +50,8 @@ const posPorN = new Map(D.posicoes.map((p) => [p.n, p]));
 const pilhaDe = (n) => D.pilhas[String(n)] || [];
 const ruasDaParte = (p) => D.ruas.filter((r) => r.p === p);
 const normCod = (c) => (c || "").trim().toUpperCase();
+// Chave de casamento da busca: o estocado liga pelo NOME (o código EST: se repete entre cooperados)
+const chave = (c, nome, e) => (e ? "EST|" + nome : normCod(c));
 
 // ── Three.js ────────────────────────────────────────────────────────────────
 const canvas = $("gl");
@@ -283,7 +285,7 @@ scene.add(hoverBox);
 
 // ── Cores ───────────────────────────────────────────────────────────────────
 function materialDo(r) {
-  if (state.matched.size && state.matched.has(normCod(r.c))) return M.verde;     // busca > saldo
+  if (state.matched.size && state.matched.has(chave(r.c, r.nome, r.e))) return M.verde;     // busca > saldo
   if (r.e) return M.violeta;                                                          // estocado: fora do saldo
   const d = D.divergencia[r.c];
   if (d) return d.t === "falta" ? M.vermelho : M.azul;
@@ -444,7 +446,7 @@ function montarChips() {
 function acertos() {
   const pos = [];
   if (state.matched.size) {
-    for (const c of casas.values()) if (c.racks.some((m) => state.matched.has(normCod(m.userData.rack.c)))) pos.push(c.p);
+    for (const c of casas.values()) if (c.racks.some((m) => state.matched.has(chave(m.userData.rack.c, m.userData.rack.nome, m.userData.rack.e)))) pos.push(c.p);
   }
   return pos;
 }
@@ -547,7 +549,7 @@ $("qNum").addEventListener("keydown", (e) => {
 });
 
 // ── Busca por produto ───────────────────────────────────────────────────────
-const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, k: fold(p.n) + " " + fold(p.c) }));
+const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, e: p.e, k: fold(p.n) + " " + fold(p.c) }));
 function buscarProduto(q) {
   const limpa = fold(q).trim();
   if (limpa.length < 2) return [];
@@ -562,7 +564,7 @@ $("qProd").addEventListener("input", () => {
 function aplicarBuscaProduto() {
   const q = $("qProd").value;
   const achados = buscarProduto(q);
-  state.matched = new Set(achados.map((p) => normCod(p.c)));
+  state.matched = new Set(achados.map((p) => chave(p.c, p.n, p.e)));
   const msg = $("msg");
   if (!state.matched.size) {
     msg.innerHTML = q.trim().length >= 2 ? "nenhum produto no galpão" : "";

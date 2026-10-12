@@ -119,3 +119,30 @@ def test_ler_tudo_sem_materiais_terceiros_nao_derruba(monkeypatch):
 def test_exemplo_nao_cria_divergencia_para_estocado():
     t = dd.tudo_exemplo()
     assert not any(k.startswith("EST:") for k in t["galpao"]["divergencia"])
+
+
+def test_mesmo_codigo_em_dois_cooperados_nao_troca_o_nome():
+    # EST:42200 é o mesmo código para dois cooperados: o nome do palete é o que liga ao item
+    racks = [
+        {"posicao": 45, "ordem": 2, "produto_codigo": "EST:42200", "produto_nome": "ROUNDUP 20L · ANA", "quantidade": 10},
+        {"posicao": 46, "ordem": 1, "produto_codigo": "EST:42200", "produto_nome": "ROUNDUP 20L · MARCELO", "quantidade": 45},
+    ]
+    out = dd.montar(racks, [], {}, [])
+    assert out["pilhas"]["45"][0]["nome"] == "ROUNDUP 20L · ANA"
+    assert out["pilhas"]["46"][0]["nome"] == "ROUNDUP 20L · MARCELO"
+    assert [c["n"] for c in out["catalogo"] if c.get("e")] == ["ROUNDUP 20L · ANA", "ROUNDUP 20L · MARCELO"]
+    linhas = [
+        {"razao_social": "MARCELO", "descricao": "ROUNDUP 20L", "codigo": "42200", "saldo": "99"},
+        {"razao_social": "ANA", "descricao": "ROUNDUP 20L", "codigo": "42200", "saldo": "10"},
+    ]
+    itens = {i["coop"]: i["end"] for i in dd.estocados_da_cena(linhas, out, br.montar(None))["itens"]}
+    assert itens == {"MARCELO": ["Galpão 46 · N1"], "ANA": ["Galpão 45 · N2"]}
+
+
+def test_catalogo_do_barracao_tem_um_estocado_por_cooperado():
+    out = br.montar([
+        {"id": 1, "rotulo": "BAR-01", "pos_x": 100, "pos_z": 100, "produto_codigo": "EST:9", "produto_nome": "A · ANA", "quantidade": 1},
+        {"id": 2, "rotulo": "BAR-02", "pos_x": 300, "pos_z": 100, "produto_codigo": "EST:9", "produto_nome": "A · BIA", "quantidade": 1},
+        {"id": 3, "rotulo": "BAR-03", "pos_x": 500, "pos_z": 100, "produto_codigo": "123", "produto_nome": "C", "quantidade": 1},
+    ])
+    assert out["catalogo"] == [{"c": "123", "n": "C"}, {"c": "EST:9", "n": "A · ANA", "e": True}, {"c": "EST:9", "n": "A · BIA", "e": True}]
