@@ -136,15 +136,7 @@ def _stat(rotulo: str, valor: object, cor: str | None = None) -> str:
 if mapa == "galpao":
     pilhas = dados["pilhas"]
     total = len(dados["posicoes"])
-    falta = sum(1 for d in dados["divergencia"].values() if d["t"] == "falta")
-    sobra = sum(1 for d in dados["divergencia"].values() if d["t"] == "sobra")
-    chips = [
-        _stat(f"de {total} posições com carga", len(pilhas)),
-        _stat("livres", total - len(pilhas)),
-        _stat("racks", sum(len(p) for p in pilhas.values())),
-        _stat("produtos com carga sem endereço", falta, "#e53935"),
-        _stat("endereçados além do sistema", sobra, "#1565C0"),
-    ]
+    chips = [_stat(f"de {total} posições com carga", len(pilhas))]
 elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]
@@ -167,8 +159,6 @@ capacidade = [_pct(f"da capacidade · {c['nome']}", c["pct"], c["dica"]) for c i
 chips = capacidade + chips
 if motivo:
     chips.append('<span class="stat demo">dados de exemplo</span>')
-elif hora:
-    chips.append(f'<span class="stat hora">↻ lido às {hora} · cache de 60 s</span>')
 st.markdown('<div class="stats">' + "".join(chips) + "</div>", unsafe_allow_html=True)
 
 if motivo:
