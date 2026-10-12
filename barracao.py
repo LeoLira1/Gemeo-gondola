@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from estocados import codigo_eh_estocado
+
 # ── Obra (centímetros) ──────────────────────────────────────────────────────
 LARGURA = 3500.0          # X: a parede das aberturas tem esta medida
 PROFUNDIDADE = 1000.0     # Z: da parede das aberturas (z = 0) à do fundo
@@ -100,10 +102,11 @@ def montar(linhas: list[dict[str, Any]] | None) -> dict[str, Any]:
                 "x": _num(r.get("pos_x")) / 100, "z": _num(r.get("pos_z")) / 100,
                 "c": r.get("produto_codigo") or "", "n": r.get("produto_nome") or "",
                 "q": _num(r.get("quantidade")),
+                "e": codigo_eh_estocado(r.get("produto_codigo")),
             })
     else:
         for p in posicoes_padrao():
-            pal.append({"id": None, "rot": p["rot"], "x": p["x"] / 100, "z": p["z"] / 100, "c": "", "n": "", "q": 0.0})
+            pal.append({"id": None, "rot": p["rot"], "x": p["x"] / 100, "z": p["z"] / 100, "c": "", "n": "", "q": 0.0, "e": False})
 
     # Fileiras: agrupa os Z (a 10 cm), do fundo (maior Z) para a frente
     zs = sorted({round(p["z"] * 10) for p in pal}, reverse=True)

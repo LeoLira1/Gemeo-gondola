@@ -23,6 +23,7 @@
     <span><i style="background:#e53935"></i>Carga sem endereço</span>
     <span><i style="background:#1565C0"></i>Endereçado além do sistema</span>
     <span><i style="background:#2e9e4f"></i>Produto buscado</span>
+    <span><i style="background:#8B5CF6"></i>Estocado (cooperado, fora do saldo)</span>
     <span><i style="background:transparent;border:1px dashed #8d8b85"></i>Vaga livre</span>
     <span><i style="background:#cfd3d8"></i>Escada p/ mesanino</span>
     <span><i style="background:#1b8a4a"></i>Chuveiro lava-olhos</span>
@@ -78,7 +79,7 @@ scene.add(sun, sun.target);
 const mat = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.92, metalness: 0 }, extra));
 const M = {
   branco: mat(0xf4f2ed), verde: mat(0x2e9e4f, { roughness: 0.8 }),
-  vermelho: mat(RED), azul: mat(BLUE), madeira: mat(0xc99d66, { roughness: 1 }),
+  vermelho: mat(RED), azul: mat(BLUE), violeta: mat(0x8B5CF6), madeira: mat(0xc99d66, { roughness: 1 }),
   laje: mat(0xf8f6f1, { roughness: 1 }), vaga: new THREE.MeshBasicMaterial({ color: 0xe6e2d9, transparent: true, opacity: 0.45, depthWrite: false }),
 };
 const lineGris = new THREE.LineBasicMaterial({ color: 0x9a9892 });
@@ -283,6 +284,7 @@ scene.add(hoverBox);
 // ── Cores ───────────────────────────────────────────────────────────────────
 function materialDo(r) {
   if (state.matched.size && state.matched.has(normCod(r.c))) return M.verde;     // busca > saldo
+  if (r.e) return M.violeta;                                                          // estocado: fora do saldo
   const d = D.divergencia[r.c];
   if (d) return d.t === "falta" ? M.vermelho : M.azul;
   return M.branco;
@@ -619,6 +621,7 @@ function verHover() {
     tip.appendChild(document.createElement("br"));
     t("span", `Cód. ${r.c}  `);
     t("span", `${fmt.format(r.q)} un`, "q");
+    if (r.e) t("div", "Estocado (cooperado) · fora do saldo da loja", "s");
     const d = D.divergencia[r.c];
     if (d) {
       const dif = Math.abs(d.end - d.sis);

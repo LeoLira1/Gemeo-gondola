@@ -33,6 +33,24 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 - Cache de leitura de 60 s (`st.cache_data`) + botão **Atualizar**.
 - Sem secrets ou sem conseguir ler o banco, o app mostra **dados de exemplo** e avisa.
 
+## Produtos estocados (material de cooperado) — "EST:" fica fora do saldo
+
+"Estocados" é material de cooperado que a CAMDA guarda no galpão e no barracão. Já foi faturado e saiu do sistema,
+então **não entra na conta de estoque da loja** (saldo, baixa pela contagem, Modo Conferência). A lista vem de
+`materiais_terceiros` (`saldo > 0`), a mesma do app Estocados.
+
+- **Regra:** o palete de estocado tem `produto_codigo` começando por `EST:` e `produto_nome` = `PRODUTO · COOPERADO`
+  (essa é a chave que liga o palete ao item; o código sozinho não serve). Paletes `EST:` **não vão para
+  `estoque_localizado`** nem entram nos grupos de códigos, no saldo ou na divergência vermelho/azul deste app
+  (`dados.montar`). Sem coluna nova no banco. A regra pura está em `estocados.py` (`deve_espelhar`).
+- **Botão "Produtos estocados"** no galpão e no barracão: busca por cooperado, produto ou código (sem acento, vários
+  termos), lista agrupada por cooperado com saldo e o endereço (`📍 Galpão 40 · N4`, `BAR-07` ou `sem endereço`).
+- **Mapa:** paletes de estocado em violeta (`#8B5CF6`).
+- **Chip do galpão:** `38 livres · 30 estocados · 61 loja` (parte zerada some); vagas = posições × níveis (129 × 4 = 516).
+- **Somente leitura:** lançar, ajustar e "Retirar do endereço" continuam no app Flutter Gôndolas; este app não escreve
+  no banco. Quem um dia escrever aqui deve checar `deve_espelhar(codigo)` antes de gravar em `estoque_localizado`.
+- Se `materiais_terceiros` não puder ser lida, a lista fica vazia e o app avisa; o resto segue.
+
 ## Rodar local
 
 ```bash
@@ -59,6 +77,7 @@ Testes da lógica (opcional): `pip install pytest && pytest tests`.
 | `loja.py` | Planta da loja e produtos por estrutura (porte do Gondolas) |
 | `ui.css`, `ui.js` | Visual e controles compartilhados pelas cenas (legenda recolhível, botão de rótulos) |
 | `.streamlit/config.toml` | Tema (cores) e barra de ferramentas do Streamlit |
+| `estocados.py` | Produtos estocados: busca, nome do palete, endereços, resumo de ocupação e a regra `EST:` |
 | `barracao.py` | Medidas e endereços do barracão (porte do Gondolas) |
 | `cena_barracao.html` | Cena Three.js do barracão |
 | `cena.html` | Cena Three.js do galpão |
