@@ -248,3 +248,22 @@ def test_escada_paralela_a_rua_1_do_14_ao_11():
 def test_escada_vai_no_json_do_galpao():
     import dados as dde
     assert dde.dados_exemplo()["escada"]["parte"] == 1
+
+
+# ── Chuveiro lava-olhos ─────────────────────────────────────────────────────
+
+
+def test_lava_olhos_alinhado_a_rua_2_alem_do_25():
+    lv = g.lava_olhos()
+    p25 = g.POSICAO_POR_NUMERO[25]
+    assert lv["parte"] == 1 and lv["rua"] == 2 and lv["z"] == p25.z                    # na linha da Rua 2
+    assert lv["x"] < p25.x - p25.tamanho_x / 2                                         # a oeste da ponta da fileira
+    assert abs(lv["altura"] - (0.12 + g.PASSO_NIVEL + g.ALTURA_NIVEL)) < 1e-6          # topo de 2 níveis
+    # longe o bastante de qualquer rack (a cabeça do chuveiro avança ~0,9 m para o lado)
+    for p in g.POSICOES:
+        assert not (abs(p.x - lv["x"]) < p.tamanho_x / 2 + 0.9 and abs(p.z - lv["z"]) < p.tamanho_z / 2 + 0.3), p.numero
+
+
+def test_lava_olhos_vai_no_json_do_galpao():
+    import dados as ddl
+    assert ddl.dados_exemplo()["lavaolhos"]["niveis"] == 2
