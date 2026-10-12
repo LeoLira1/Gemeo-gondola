@@ -13,10 +13,16 @@
   const campo = $$("qProd");
   const linha = (campo && campo.closest(".row")) || $$("top");
   const n = document.createElement("button");
-  n.className = "btn"; n.id = "bRot"; n.title = "Mostrar ou ocultar os números sobre as estruturas";
-  const ligar = (on) => { window.__rotulosOn = on; n.textContent = "Rótulos"; n.classList.toggle("off", !on); dirty = true; };
-  n.onclick = () => ligar(window.__rotulosOn === false);
-  ligar(true);
+  n.className = "btn"; n.id = "bRot"; n.title = "Mostrar os números sobre as estruturas (começa desligado)";
+  // Começa SEM rótulos; o botão liga. A escolha acompanha a troca de aba (sessionStorage, só nesta aba do navegador).
+  const ligar = (on) => {
+    window.__rotulosOn = on; n.textContent = on ? "Rótulos ✓" : "Rótulos"; n.classList.toggle("on", on); dirty = true;
+    try { sessionStorage.setItem("camda_rotulos", on ? "1" : "0"); } catch (e) {}
+  };
+  n.onclick = () => ligar(!window.__rotulosOn);
+  let inicial = false;
+  try { inicial = sessionStorage.getItem("camda_rotulos") === "1"; } catch (e) {}
+  ligar(inicial);
   linha.insertBefore(n, $$("msg") || null);
 })();
 

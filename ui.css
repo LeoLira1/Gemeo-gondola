@@ -33,6 +33,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 0 14px; min-height: 44px; cursor: pointer;
   font: inherit; font-weight: 600; color: #5d5a53; box-shadow: var(--sombra); backdrop-filter: blur(8px); transition: background .15s, color .15s; }
 .btn:hover { background: #fff; }
+.btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 .btn.off { color: var(--muted); background: rgba(255,255,255,.6); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
 #msg { color: var(--muted); font-size: 12px; padding: 0 4px; }
 #msg b { color: var(--hit); }

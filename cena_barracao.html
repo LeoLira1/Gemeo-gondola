@@ -340,7 +340,7 @@ function frame(now) {
   }
   for (const s of rotulos) {
     const d = camera.position.distanceTo(s.getWorldPosition(tmpV));
-    s.material.visible = window.__rotulosOn !== false && !s.userData.fade;
+    s.material.visible = window.__rotulosOn === true && !s.userData.fade;
     const vis = d < s.userData.lod; if (s.visible !== vis) { s.visible = vis; dirty = true; }
     const k = THREE.MathUtils.clamp(d * 0.03, 0.55, 1.4) * s.userData.base;
     if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2.4, 1); dirty = true; }

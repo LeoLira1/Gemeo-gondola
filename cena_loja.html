@@ -493,7 +493,7 @@ function frame(now) {
   if (state.bonecos > 0) { andarBonecos(dt); dirty = true; }
   for (const s of labels) {
     const d = camera.position.distanceTo(s.getWorldPosition(tmpV)), k = THREE.MathUtils.clamp(d * 0.03, 0.6, 1.5) * s.userData.base;
-    s.material.visible = window.__rotulosOn !== false;
+    s.material.visible = window.__rotulosOn === true;
     if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2.4, 1); dirty = true; }
   }
   if (selGrupo.visible) { selFill.material.opacity = 0.28 + 0.14 * Math.sin(now / 280); dirty = true; }
