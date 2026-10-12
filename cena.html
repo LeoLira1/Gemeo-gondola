@@ -102,6 +102,23 @@ function addBoxTo(grupo, x0, x1, y0, y1, z0, z1, cor) {
   m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); m.castShadow = m.receiveShadow = true; grupo.add(m); return m;
 }
 
+// Textura procedural de cimento queimado: ruído de baixa resolução (±2–3% de tom), sem arquivo externo.
+// 128×128 px (~64 KB), gerada uma vez; o tom base vem da cor do material (#C9C9C6).
+const cimentoTex = (() => {
+  const S = 128, c = document.createElement("canvas");
+  c.width = c.height = S;
+  const g = c.getContext("2d"), img = g.createImageData(S, S);
+  for (let i = 0; i < S * S; i++) {
+    const v = Math.round(255 * (0.975 + Math.random() * 0.025 - Math.sin(i * 0.013) * 0.004));   // 97%–100% do tom base
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  return t;
+})();
+
 // Laje do chão (uma só, redimensionada por parte)
 const laje = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), M.laje);
 laje.receiveShadow = true;
@@ -357,6 +374,7 @@ function ajustarLaje() {
   const margem = 2.6;
   laje.scale.set(e.maxX - e.minX + margem * 2, 1, e.maxZ - e.minZ + margem * 2);
   laje.position.set((e.minX + e.maxX) / 2, -0.1, (e.minZ + e.maxZ) / 2);
+  cimentoTex.repeat.set(laje.scale.x / 3, laje.scale.z / 3);          // um "bloco" de textura a cada ~3 m
   const R = Math.hypot(e.maxX - e.minX, e.maxZ - e.minZ) / 2 + 4;
   const cx = (e.minX + e.maxX) / 2, cz = (e.minZ + e.maxZ) / 2;
   sun.target.position.set(cx, 0, cz);
@@ -694,6 +712,36 @@ function frame(now) {
   dirty = false;
   renderer.render(scene, camera);
 }
+
+// ── Piso: "cimento" (padrão) ou "branco" — só visual, escolha salva no localStorage ──
+const PISO = {
+  cimento: { cor: 0xc9c9c6, mapa: cimentoTex, hemi: 0.7, sol: 0.62, vagaCor: 0xf1efe9, vagaOp: 0.7, linha: 0x55544f, fraca: 0x9b9a95, borda: 0x8a8984 },
+  branco: { cor: 0xf8f6f1, mapa: null, hemi: 0.74, sol: 0.54, vagaCor: 0xe6e2d9, vagaOp: 0.45, linha: 0x9a9892, fraca: 0xc9c5bb, borda: 0xcfcbc1 },
+};
+const luzHemi = scene.children.find((o) => o.isHemisphereLight);
+const btnPiso = document.createElement("button");
+btnPiso.id = "bPiso"; btnPiso.className = "btn";
+$("wrap").appendChild(btnPiso);
+function aplicarPiso(modo) {
+  const p = PISO[modo] || PISO.cimento;
+  M.laje.color.setHex(p.cor); M.laje.map = p.mapa; M.laje.roughness = 1; M.laje.metalness = 0; M.laje.needsUpdate = true;
+  luzHemi.intensity = p.hemi; sun.intensity = p.sol;
+  M.vaga.color.setHex(p.vagaCor); M.vaga.opacity = p.vagaOp;
+  lineGris.color.setHex(p.linha); lineFraca.color.setHex(p.fraca); lineBorda.color.setHex(p.borda);
+  btnPiso.textContent = modo === "branco" ? "◻" : "▦";
+  btnPiso.title = modo === "branco" ? "Piso branco — toque para trocar para cimento" : "Piso cimento — toque para trocar para branco";
+  btnPiso.setAttribute("aria-label", btnPiso.title);
+  btnPiso.dataset.modo = modo;
+  dirty = true;
+}
+let modoPiso = "cimento";
+try { if (localStorage.getItem("camda_piso") === "branco") modoPiso = "branco"; } catch (e) {}
+btnPiso.onclick = () => {
+  modoPiso = modoPiso === "branco" ? "cimento" : "branco";
+  try { localStorage.setItem("camda_piso", modoPiso); } catch (e) {}
+  aplicarPiso(modoPiso);
+};
+aplicarPiso(modoPiso);
 
 // ── Início ──────────────────────────────────────────────────────────────────
 redimensionar();
