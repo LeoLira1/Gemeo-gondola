@@ -79,3 +79,46 @@
   try { inicial = sessionStorage.getItem("camda_busca") || ""; } catch (e) {}
   if (inicial) { campo.value = inicial; campo.dispatchEvent(new Event("input")); }
 })();
+
+// ── Produtos estocados (material de cooperado), galpão e barracão ───────────
+// Lista de materiais_terceiros com o endereço de cada item (já ligado pelo Python via "PRODUTO · COOPERADO").
+// É material já faturado: fica FORA do saldo. Aqui é só consulta.
+(function () {
+  if (typeof D === "undefined" || !D.estocados || (D.area !== "galpao" && D.area !== "barracao")) return;
+  const wrap = document.getElementById("wrap"), msg = document.getElementById("msg");
+  const linha = (document.getElementById("qProd") || {}).closest ? document.getElementById("qProd").closest(".row") : null;
+  const dobra = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const fmtN = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+  const itens = D.estocados.itens.map((i) => ({ ...i, k: dobra(`${i.coop} ${i.prod} ${i.cod}`) }));
+
+  const painel = document.createElement("div");
+  painel.id = "estoc"; painel.className = "panel"; painel.style.display = "none";
+  painel.innerHTML = `<button class="x" title="Fechar">×</button><h4>Produtos estocados</h4>
+    <div class="sub">Material de cooperado guardado na CAMDA · fora do saldo da loja</div>
+    <input id="qEst" placeholder="cooperado, produto ou código" autocomplete="off"><div id="estLista"></div>`;
+  wrap.appendChild(painel);
+
+  function desenhar() {
+    const termos = dobra($("qEst").value).trim().split(/\s+/).filter(Boolean);
+    const achados = itens.filter((i) => termos.every((t) => i.k.includes(t)));
+    const grupos = new Map();
+    for (const i of achados) { if (!grupos.has(i.coop)) grupos.set(i.coop, []); grupos.get(i.coop).push(i); }
+    let h = "";
+    for (const [coop, lista] of grupos) {
+      h += `<div class="coop">${esc(coop || "(sem cooperado)")}</div>`;
+      for (const i of lista) {
+        const onde = i.end.length ? "📍 " + i.end.map(esc).join(" · ") : "sem endereço";
+        h += `<div class="it"><div>${esc(i.prod)}<br><span class="onde${i.end.length ? "" : " sem"}">${onde}</span></div><b>${fmtN.format(i.saldo)}</b></div>`;
+      }
+    }
+    $("estLista").innerHTML = h || `<div class="sub">${D.estocados.ok ? "Nenhum item encontrado." : "materiais_terceiros indisponível."}</div>`;
+  }
+  const $ = (id) => document.getElementById(id);
+  const b = document.createElement("button");
+  b.className = "btn"; b.id = "bEst"; b.textContent = "Produtos estocados"; b.style.borderColor = D.estocados.cor;
+  b.onclick = () => { const abrir = painel.style.display === "none"; painel.style.display = abrir ? "block" : "none"; b.classList.toggle("on", abrir); if (abrir) desenhar(); };
+  painel.querySelector(".x").onclick = () => b.click();
+  $("qEst").addEventListener("input", desenhar);
+  (linha || $("top")).insertBefore(b, msg || null);
+})();

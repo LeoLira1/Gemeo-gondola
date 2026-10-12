@@ -23,6 +23,7 @@
     <span><i style="background:#c99d66"></i>Palete livre</span>
     <span><i style="background:#e6dfcf"></i>Bag de 1000 kg</span>
     <span><i style="background:#2e9e4f"></i>Produto buscado</span>
+    <span><i style="background:#8B5CF6"></i>Estocado (cooperado, fora do saldo)</span>
     <span><i style="background:#e87722"></i>Portão</span>
     <span><i style="background:#b9b4a8"></i>Porta</span>
     <span><i style="background:transparent;border:2px solid #e87722"></i>Selecionado</span>
@@ -38,7 +39,7 @@
 const D = /*__DADOS__*/null;
 
 const ORANGE = 0xe87722, GREEN = 0x2e9e4f;
-const C_PAREDE = 0xd2cdc2, C_VERGA = 0xbdb7aa, C_MADEIRA = 0xc99d66, C_BAG = 0xe6dfcf, C_FADE = 0xefece4;
+const C_PAREDE = 0xd2cdc2, C_VERGA = 0xbdb7aa, C_MADEIRA = 0xc99d66, C_BAG = 0xe6dfcf, C_EST = 0x8B5CF6, C_FADE = 0xefece4;
 const W = D.w, DP = D.d, PH = D.h, E = D.esp;
 const state = { sel: null, matched: new Set(), fileira: 0, paredesAltas: true };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
@@ -182,7 +183,7 @@ function pintar() {
   for (const e of pal) {
     e.matched = e.ocupado && isMatch(e.p.c);
     const fade = state.fileira && e.p.f !== state.fileira;
-    if (e.bag) e.bag.material = getMat(e.matched ? GREEN : fade ? lerpHex(C_BAG, C_FADE, 0.7) : C_BAG);
+    if (e.bag) e.bag.material = getMat(e.matched ? GREEN : fade ? lerpHex(e.p.e ? C_EST : C_BAG, C_FADE, 0.7) : e.p.e ? C_EST : C_BAG);
     setRotulo(e.label, state.sel === e ? "s" : e.matched ? "h" : "n");
     e.label.userData.fade = !!fade;
   }
@@ -246,7 +247,7 @@ function irFileira(f) {
 // ── Cartão e tooltip ────────────────────────────────────────────────────────
 function descrever(e) {
   const p = e.p;
-  return { titulo: `${p.rot} · Palete com bag`, sub: `Fileira ${p.f}` + (e.ocupado ? "" : " · palete livre"),
+  return { titulo: `${p.rot} · ${p.e ? "Palete de estocado (fora do saldo)" : "Palete com bag"}`, sub: `Fileira ${p.f}` + (e.ocupado ? "" : " · palete livre"),
     linhas: e.ocupado ? [{ l: "Bag", p: p.n || p.c, q: p.q, m: isMatch(p.c), cod: p.c }] : [] };
 }
 function mostrarCartao(e) {
