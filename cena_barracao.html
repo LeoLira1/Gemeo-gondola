@@ -47,7 +47,12 @@ const fold = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, ""
 const normCod = (c) => (c || "").trim().toUpperCase();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const isMatch = (c) => state.matched.size > 0 && state.matched.has(normCod(c));
-const wz = (z) => DP - z;                          // z local (0 = parede das aberturas) → mundo (a frente fica ao sul, perto da câmera)
+// z local (0 = parede das aberturas) → mundo: a frente fica ao sul, perto da câmera
+const wz = (z) => DP - z;
+// No Gondolas a câmera do barracão fica do lado de fora da parede das aberturas, olhando para dentro, e lá o X cresce para a
+// ESQUERDA da tela. Espelhar o X aqui deixa a cena igual à do app (BAR-34, porta e portão nos mesmos lugares).
+const wx = (x) => W - x;
+const ABERTURAS = D.aberturas.map((a) => ({ ...a, x0: wx(a.x1), x1: wx(a.x0) })).sort((p, q) => p.x0 - q.x0);
 
 // ── Three.js ────────────────────────────────────────────────────────────────
 const canvas = $("gl");
@@ -104,7 +109,7 @@ function textoNoChao(txt, x, z, larg, cor) {
   m.rotation.x = -Math.PI / 2; m.position.set(x, 0.012, z); m.renderOrder = 2; scene.add(m); return m;
 }
 // marcas das aberturas no piso e rótulos do lado de fora
-for (const a of D.aberturas) {
+for (const a of ABERTURAS) {
   const portao = a.tipo === "PORTÃO", cx = (a.x0 + a.x1) / 2;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(a.x1 - a.x0, E + 0.6), new THREE.MeshBasicMaterial({ color: portao ? ORANGE : 0xb9b4a8, transparent: true, opacity: 0.6 }));
   m.rotation.x = -Math.PI / 2; m.position.set(cx, 0.02, DP + 0.1 - E / 2 + 0.3); scene.add(m);
@@ -120,11 +125,11 @@ function montarParedes() {
   addBox(paredes, 0, W, 0, H, 0, E, C_PAREDE);                                   // fundo (norte)
   addBox(paredes, 0, E, 0, H, E, DP - E, C_PAREDE); addBox(paredes, W - E, W, 0, H, E, DP - E, C_PAREDE);   // laterais
   let x = 0;                                                                     // frente: panos entre as aberturas
-  for (const a of D.aberturas.concat([{ x0: W, x1: W, h: 0 }])) {
+  for (const a of ABERTURAS.concat([{ x0: W, x1: W, h: 0 }])) {
     if (a.x0 > x) addBox(paredes, x, a.x0, 0, H, DP - E, DP, C_PAREDE);
     x = a.x1;
   }
-  for (const a of D.aberturas) if (H > a.h) addBox(paredes, a.x0, a.x1, a.h, H, DP - E, DP, C_VERGA);   // verga acima do vão
+  for (const a of ABERTURAS) if (H > a.h) addBox(paredes, a.x0, a.x1, a.h, H, DP - E, DP, C_VERGA);   // verga acima do vão
   dirty = true;
 }
 
@@ -146,7 +151,7 @@ function labelTex(txt, estilo) {
   })());
 }
 for (const p of D.pal) {
-  const x = p.x, z = wz(p.z), ocupado = !!p.c.trim();
+  const x = wx(p.x), z = wz(p.z), ocupado = !!p.c.trim();
   const e = { p, x, z, w: D.palete.x, d: D.palete.z, h: D.palete.h + (ocupado ? D.bag.h : 0), ocupado, matched: false, bag: null, hit: null, label: null };
   addBox(scene, x - D.palete.x / 2, x + D.palete.x / 2, 0, D.palete.h, z - D.palete.z / 2, z + D.palete.z / 2, C_MADEIRA);
   if (ocupado) {
