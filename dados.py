@@ -412,3 +412,30 @@ def ler_tudo(url: str, token: str) -> dict[str, Any]:
 
 def tudo_exemplo() -> dict[str, Any]:
     return {"galpao": dados_exemplo(), "loja": loja_exemplo(), "barracao": barracao_exemplo(), "erros": {}}
+
+
+# ── Ocupação em porcentagem (indicadores do topo da página) ─────────────────
+
+
+def percentual(parte: float, todo: float) -> int:
+    """Porcentagem inteira (arredonda metade para cima); 0 quando não há total."""
+    return int(100 * parte / todo + 0.5) if todo else 0
+
+
+def ocupacao_galpao(g_: dict[str, Any]) -> dict[str, int]:
+    """Vagas ocupadas (posições com ao menos um rack) e capacidade usada (racks ÷ posições × níveis)."""
+    posicoes = len(g_["posicoes"])
+    racks = sum(len(p) for p in g_["pilhas"].values())
+    return {
+        "vagas": percentual(len(g_["pilhas"]), posicoes),
+        "capacidade": percentual(racks, posicoes * g_["geo"]["niveisMax"]),
+    }
+
+
+def ocupacao_barracao(b_: dict[str, Any]) -> int:
+    return percentual(sum(1 for p in b_["pal"] if p["c"].strip()), len(b_["pal"]))
+
+
+def ocupacao_loja(l_: dict[str, Any]) -> int:
+    itens = [i for i in l_["itens"] if i["kind"] != "balcao"]
+    return percentual(sum(1 for i in itens if i["prod"]), len(itens))

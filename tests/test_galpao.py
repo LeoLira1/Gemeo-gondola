@@ -267,3 +267,32 @@ def test_lava_olhos_alinhado_a_rua_2_alem_do_25():
 def test_lava_olhos_vai_no_json_do_galpao():
     import dados as ddl
     assert ddl.dados_exemplo()["lavaolhos"]["niveis"] == 2
+
+
+# ── Ocupação em porcentagem ─────────────────────────────────────────────────
+
+
+def test_percentual_arredonda_e_protege_divisao_por_zero():
+    import dados as ddp
+    assert ddp.percentual(1, 2) == 50 and ddp.percentual(97, 129) == 75 and ddp.percentual(0, 10) == 0
+    assert ddp.percentual(1, 8) == 13        # 12,5 → 13 (metade para cima)
+    assert ddp.percentual(5, 0) == 0
+
+
+def test_ocupacao_do_galpao_vagas_e_capacidade():
+    import dados as ddp
+    out = ddp.montar(
+        [{"posicao": 1, "ordem": 1, "produto_codigo": "A", "produto_nome": "A", "quantidade": 1},
+         {"posicao": 1, "ordem": 2, "produto_codigo": "A", "produto_nome": "A", "quantidade": 1},
+         {"posicao": 2, "ordem": 1, "produto_codigo": "B", "produto_nome": "B", "quantidade": 1}],
+        [], {}, [])
+    oc = ddp.ocupacao_galpao(out)
+    assert oc["vagas"] == ddp.percentual(2, 129)          # 2 de 129 posições
+    assert oc["capacidade"] == ddp.percentual(3, 129 * 4)  # 3 racks de 516
+
+
+def test_ocupacao_barracao_e_loja_do_exemplo():
+    import dados as ddp
+    b = ddp.barracao_exemplo()
+    assert ddp.ocupacao_barracao(b) == ddp.percentual(sum(1 for p in b["pal"] if p["c"]), 100)
+    assert 0 <= ddp.ocupacao_loja(ddp.loja_exemplo()) <= 100

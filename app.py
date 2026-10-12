@@ -39,6 +39,9 @@ header[data-testid="stHeader"] { background: transparent; }
   box-shadow: 0 1px 2px rgba(60,50,30,.04); white-space: nowrap; }
 .stat b { color: #2b2a27; font-weight: 700; }
 .stat .d { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; margin-right: .45rem; vertical-align: .05rem; }
+.stat.pct { padding-left: .6rem; }
+.stat.pct .barra { display: inline-block; width: 3.2rem; height: .5rem; border-radius: 999px; background: #ece8de; margin-right: .5rem; vertical-align: .08rem; overflow: hidden; }
+.stat.pct .barra i { display: block; height: 100%; background: linear-gradient(90deg, #f08a3c, #e87722); border-radius: 999px; }
 .stat.demo { background: #fff4e8; border-color: #f3c89c; color: #a4570f; }
 .stat.hora { margin-left: auto; background: transparent; border-color: transparent; box-shadow: none; color: #8a877f; }
 iframe { border-radius: 18px; border: 1px solid #e3dfd5 !important; box-shadow: 0 14px 40px rgba(60,50,30,.14); background: #eeebe4; }
@@ -119,6 +122,12 @@ with c_btn:
         st.rerun()
 
 
+def _pct(rotulo: str, pct: int, dica: str = "") -> str:
+    """Indicador de ocupação: barrinha + porcentagem."""
+    return (f'<span class="stat pct" title="{dica}"><span class="barra"><i style="width:{min(pct, 100)}%"></i></span>'
+            f"<b>{pct}%</b> {rotulo}</span>")
+
+
 def _stat(rotulo: str, valor: object, cor: str | None = None) -> str:
     ponto = f'<span class="d" style="background:{cor}"></span>' if cor else ""
     return f'<span class="stat">{ponto}<b>{valor}</b> {rotulo}</span>'
@@ -129,7 +138,10 @@ if mapa == "galpao":
     total = len(dados["posicoes"])
     falta = sum(1 for d in dados["divergencia"].values() if d["t"] == "falta")
     sobra = sum(1 for d in dados["divergencia"].values() if d["t"] == "sobra")
+    oc = dd.ocupacao_galpao(dados)
     chips = [
+        _pct("ocupado", oc["vagas"], f"Vagas ocupadas: {len(pilhas)} de {total} posições têm ao menos um rack"),
+        _pct("da capacidade", oc["capacidade"], f"Racks ÷ capacidade ({total} posições × {dados['geo']['niveisMax']} níveis)"),
         _stat(f"de {total} posições com carga", len(pilhas)),
         _stat("livres", total - len(pilhas)),
         _stat("racks", sum(len(p) for p in pilhas.values())),
@@ -140,6 +152,7 @@ elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]
     chips = [
+        _pct("ocupado", dd.ocupacao_barracao(dados), f"Paletes com bag: {len(ocupados)} de {len(pal)}"),
         _stat(f"de {len(pal)} paletes com bag", len(ocupados), "#c99d66"),
         _stat("livres", len(pal) - len(ocupados)),
         _stat("unidades", f"{sum(p['q'] for p in ocupados):g}"),
@@ -149,6 +162,7 @@ elif mapa == "barracao":
 else:
     itens = [i for i in dados["itens"] if i["kind"] != "balcao"]
     chips = [
+        _pct("com produto", dd.ocupacao_loja(dados), "Estruturas com ao menos um produto endereçado"),
         _stat("estruturas", len(itens), "#4caf50"),
         _stat("com produto endereçado", sum(1 for i in itens if i["prod"])),
         _stat("produtos", len(dados["catalogo"])),
