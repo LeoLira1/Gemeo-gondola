@@ -140,8 +140,9 @@ if mapa == "galpao":
     sobra = sum(1 for d in dados["divergencia"].values() if d["t"] == "sobra")
     oc = dd.ocupacao_galpao(dados)
     chips = [
-        _pct("ocupado", oc["vagas"], f"Vagas ocupadas: {len(pilhas)} de {total} posições têm ao menos um rack"),
-        _pct("da capacidade", oc["capacidade"], f"Racks ÷ capacidade ({total} posições × {dados['geo']['niveisMax']} níveis)"),
+        _pct(f"da capacidade · Galpão {parte}", o["pct"], f"Galpão {parte}: {o['racks']} racks de {o['capacidade']} (posições × {dados['geo']['niveisMax']} níveis)")
+        for parte, o in oc.items()
+    ] + [
         _stat(f"de {total} posições com carga", len(pilhas)),
         _stat("livres", total - len(pilhas)),
         _stat("racks", sum(len(p) for p in pilhas.values())),

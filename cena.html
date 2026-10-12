@@ -460,7 +460,8 @@ function atualizarStats() {
   const cs = [...casas.values()].filter((c) => c.p.p === state.parte);
   const livres = cs.filter((c) => c.vazia).length;
   const racks = cs.reduce((s, c) => s + c.racks.length, 0);
-  $("stats").innerHTML = `Parte ${state.parte}: <b>${cs.length}</b> posições · <b>${cs.length - livres}</b> com carga · <b>${livres}</b> livres · <b>${racks}</b> racks`;
+  const cap = cs.length * D.geo.niveisMax, pct = cap ? Math.round((100 * racks) / cap) : 0;
+  $("stats").innerHTML = `Parte ${state.parte}: <b>${pct}%</b> da capacidade (${racks} de ${cap} racks) · <b>${cs.length - livres}</b> de ${cs.length} posições com carga · <b>${livres}</b> livres`;
 }
 
 function refrescar() {

@@ -23,8 +23,9 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 - **Chuveiro lava-olhos (referência):** equipamento de emergência verde na Parte 1, alinhado à Rua 2 e além do nº 25, com
   altura de até 2 níveis (2,38 m). Digite `chuveiro` no campo Nº para ir até ele. A distância ao nº 25 é estimativa
   (`galpao.py`).
-- **Ocupação em %:** o primeiro indicador de cada aba. Galpão: vagas ocupadas (posições com ao menos um rack ÷ 129) e
-  capacidade usada (racks ÷ 129 posições × 4 níveis). Barracão: paletes com bag ÷ 100. Loja: estruturas com produto.
+- **Ocupação em %:** o primeiro indicador de cada aba. Galpão: capacidade usada de cada parte, **separadas** (Galpão 1:
+  racks ÷ 85 posições × 4 níveis; Galpão 2: racks ÷ 44 × 4), também no resumo do canto do mapa conforme a parte aberta.
+  Barracão: paletes com bag ÷ 100. Loja: estruturas com produto.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.
 - Quantidades em **unidades**, sem conversão.

@@ -422,13 +422,25 @@ def percentual(parte: float, todo: float) -> int:
     return int(100 * parte / todo + 0.5) if todo else 0
 
 
-def ocupacao_galpao(g_: dict[str, Any]) -> dict[str, int]:
-    """Vagas ocupadas (posições com ao menos um rack) e capacidade usada (racks ÷ posições × níveis)."""
-    posicoes = len(g_["posicoes"])
-    racks = sum(len(p) for p in g_["pilhas"].values())
+def ocupacao_galpao(g_: dict[str, Any]) -> dict[int, dict[str, int]]:
+    """Capacidade usada de CADA parte do galpão, separadas: racks ÷ (posições da parte × níveis).
+
+    Devolve {parte: {"racks", "capacidade" (em racks), "pct"}}.
+    """
+    niveis = g_["geo"]["niveisMax"]
+    parte_de = {p["n"]: p["p"] for p in g_["posicoes"]}
+    posicoes: dict[int, int] = {}
+    for parte in parte_de.values():
+        posicoes[parte] = posicoes.get(parte, 0) + 1
+    racks: dict[int, int] = {parte: 0 for parte in posicoes}
+    for n, pilha in g_["pilhas"].items():
+        parte = parte_de.get(int(n))
+        if parte is not None:
+            racks[parte] += len(pilha)
     return {
-        "vagas": percentual(len(g_["pilhas"]), posicoes),
-        "capacidade": percentual(racks, posicoes * g_["geo"]["niveisMax"]),
+        parte: {"racks": racks[parte], "capacidade": posicoes[parte] * niveis,
+                "pct": percentual(racks[parte], posicoes[parte] * niveis)}
+        for parte in sorted(posicoes)
     }
 
 
