@@ -47,7 +47,9 @@ const $ = (id) => document.getElementById(id);
 const fold = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const normCod = (c) => (c || "").trim().toUpperCase();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const isMatch = (c) => state.matched.size > 0 && state.matched.has(normCod(c));
+// o estocado liga pelo NOME (o código EST: se repete entre cooperados); o resto, pelo código
+const chave = (c, nome, e) => (e ? "EST|" + nome : normCod(c));
+const isMatch = (p) => state.matched.size > 0 && state.matched.has(chave(p.c, p.n, p.e));
 // z local (0 = parede das aberturas) → mundo: a frente fica ao sul, perto da câmera
 const wz = (z) => DP - z;
 // No Gondolas a câmera do barracão fica do lado de fora da parede das aberturas, olhando para dentro, e lá o X cresce para a
@@ -181,7 +183,7 @@ hoverBox.visible = false; scene.add(hoverBox);
 
 function pintar() {
   for (const e of pal) {
-    e.matched = e.ocupado && isMatch(e.p.c);
+    e.matched = e.ocupado && isMatch(e.p);
     const fade = state.fileira && e.p.f !== state.fileira;
     if (e.bag) e.bag.material = getMat(e.matched ? GREEN : fade ? lerpHex(e.p.e ? C_EST : C_BAG, C_FADE, 0.7) : e.p.e ? C_EST : C_BAG);
     setRotulo(e.label, state.sel === e ? "s" : e.matched ? "h" : "n");
@@ -248,7 +250,7 @@ function irFileira(f) {
 function descrever(e) {
   const p = e.p;
   return { titulo: `${p.rot} · ${p.e ? "Palete de estocado (fora do saldo)" : "Palete com bag"}`, sub: `Fileira ${p.f}` + (e.ocupado ? "" : " · palete livre"),
-    linhas: e.ocupado ? [{ l: "Bag", p: p.n || p.c, q: p.q, m: isMatch(p.c), cod: p.c }] : [] };
+    linhas: e.ocupado ? [{ l: "Bag", p: p.n || p.c, q: p.q, m: isMatch(p), cod: p.c }] : [] };
 }
 function mostrarCartao(e) {
   const d = descrever(e), el = $("info");
@@ -274,13 +276,13 @@ const irNumero = () => { const v = $("qNum").value.trim(); if (!v) { limparSelec
 $("qNum").addEventListener("input", () => { clearTimeout(tNum); tNum = setTimeout(irNumero, 400); });
 $("qNum").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { clearTimeout(tNum); irNumero(); } });
 
-const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, k: fold(p.n) + " " + fold(p.c) }));
+const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, e: p.e, k: fold(p.n) + " " + fold(p.c) }));
 let tProd = null;
 $("qProd").addEventListener("input", () => { clearTimeout(tProd); tProd = setTimeout(buscarProduto, 220); });
 function buscarProduto() {
   const q = fold($("qProd").value).trim(), termos = q.length >= 2 ? q.split(/\s+/) : [];
   const achados = termos.length ? catalogo.filter((p) => termos.every((t) => p.k.includes(t))) : [];
-  state.matched = new Set(achados.map((p) => normCod(p.c)));
+  state.matched = new Set(achados.map((p) => chave(p.c, p.n, p.e)));
   pintar(); marcarPontos();
   const n = pal.filter((e) => e.matched).length, un = pal.filter((e) => e.matched).reduce((s, e) => s + (e.p.q || 0), 0);
   $("msg").innerHTML = !termos.length ? "" : !achados.length ? "nenhum produto no barracão"

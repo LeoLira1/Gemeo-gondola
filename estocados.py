@@ -140,6 +140,14 @@ def resumo_ocupacao(total_vagas: int, codigos: Iterable[str]) -> str:
     return " · ".join(partes)
 
 
+def catalogo_da_cena(catalogo: dict[str, str], estocados: Iterable[tuple[str, str]]) -> list[dict[str, Any]]:
+    """Catálogo de busca das cenas: um item por código da loja e UM POR COOPERADO nos estocados
+    (`e: True`), porque dois cooperados com o mesmo produto repartem o mesmo código "EST:"."""
+    itens: list[dict[str, Any]] = [{"c": c, "n": n} for c, n in sorted(catalogo.items())]
+    itens += [{"c": c, "n": n, "e": True} for c, n in sorted(set(estocados))]
+    return itens
+
+
 def para_cena(linhas: list[dict[str, Any]] | None, galpao_racks: Iterable[dict[str, Any]],
               barracao_pal: Iterable[dict[str, Any]]) -> dict[str, Any]:
     """JSON da lista de estocados para as cenas, já com os endereços de cada item.
