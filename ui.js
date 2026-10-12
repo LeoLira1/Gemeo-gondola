@@ -26,6 +26,23 @@
   linha.insertBefore(n, $$("msg") || null);
 })();
 
+// Botão pequeno no canto superior direito: deixa a maquete girando devagar (só estético, p/ quando não está em uso).
+(function () {
+  const w = document.getElementById("wrap");
+  if (!w || typeof controls === "undefined") return;
+  const g = document.createElement("button");
+  g.id = "bGirar"; g.className = "btn"; g.textContent = "⟳"; g.title = "Girar a maquete lentamente";
+  const ligar = (on) => {
+    controls.autoRotate = on; controls.autoRotateSpeed = 0.6; g.classList.toggle("on", on); dirty = true;
+    try { sessionStorage.setItem("camda_girar", on ? "1" : "0"); } catch (e) {}
+  };
+  g.onclick = () => ligar(!controls.autoRotate);
+  let ini = false;
+  try { ini = sessionStorage.getItem("camda_girar") === "1"; } catch (e) {}
+  ligar(ini);
+  w.appendChild(g);
+})();
+
 // ── Busca global: o produto é procurado no galpão, na loja e no barracão ─────
 // O Python injeta em D.global uma linha por produto em cada local ({c, n, a: mapa, w: local}) e
 // D.area (o mapa desta cena). Cada cena acende só o que é dela; aqui sai o resumo dos três mapas,
