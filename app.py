@@ -138,11 +138,7 @@ if mapa == "galpao":
     total = len(dados["posicoes"])
     falta = sum(1 for d in dados["divergencia"].values() if d["t"] == "falta")
     sobra = sum(1 for d in dados["divergencia"].values() if d["t"] == "sobra")
-    oc = dd.ocupacao_galpao(dados)
     chips = [
-        _pct(f"da capacidade · Galpão {parte}", o["pct"], f"Galpão {parte}: {o['racks']} racks de {o['capacidade']} (posições × {dados['geo']['niveisMax']} níveis)")
-        for parte, o in oc.items()
-    ] + [
         _stat(f"de {total} posições com carga", len(pilhas)),
         _stat("livres", total - len(pilhas)),
         _stat("racks", sum(len(p) for p in pilhas.values())),
@@ -153,7 +149,6 @@ elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]
     chips = [
-        _pct("ocupado", dd.ocupacao_barracao(dados), f"Paletes com bag: {len(ocupados)} de {len(pal)}"),
         _stat(f"de {len(pal)} paletes com bag", len(ocupados), "#c99d66"),
         _stat("livres", len(pal) - len(ocupados)),
         _stat("unidades", f"{sum(p['q'] for p in ocupados):g}"),
@@ -163,11 +158,13 @@ elif mapa == "barracao":
 else:
     itens = [i for i in dados["itens"] if i["kind"] != "balcao"]
     chips = [
-        _pct("com produto", dd.ocupacao_loja(dados), "Estruturas com ao menos um produto endereçado"),
         _stat("estruturas", len(itens), "#4caf50"),
         _stat("com produto endereçado", sum(1 for i in itens if i["prod"])),
         _stat("produtos", len(dados["catalogo"])),
     ]
+# a capacidade de cada área, independente das outras e em relação às suas vagas, em todas as abas
+capacidade = [_pct(f"da capacidade · {c['nome']}", c["pct"], c["dica"]) for c in dd.capacidades(tudo)]
+chips = capacidade + chips
 if motivo:
     chips.append('<span class="stat demo">dados de exemplo</span>')
 elif hora:

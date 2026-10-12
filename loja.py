@@ -167,6 +167,25 @@ def niveis_produto(numero: int) -> int:
 ANDARES = ("Base", "Meio", "Topo")
 
 
+def faixas(item: dict[str, Any]) -> int:
+    """Quantas "vagas" de endereço a estrutura tem, para a capacidade da loja.
+
+    Gôndola: 3 andares × 6 faces = 18. Estante: um por nível (o banco guarda o nível; a coluna não entra
+    na conta). Estante Parede: 6 seções × 6 níveis. A base do Nellore (nível 0) saiu dos endereços.
+    O balcão não tem endereço.
+    """
+    k = item["kind"]
+    if k == "balcao":
+        return 0
+    if k == "gondola":
+        return len(ANDARES) * 6
+    if k == "parede":
+        return (PAREDE_MAX - PAREDE_MIN + 1) * niveis_produto(PAREDE_MIN)
+    if k == "nellore":
+        return niveis_produto(NELLORE) - 1
+    return niveis_produto(item["n"])
+
+
 def _clamp(v: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, v))
 
@@ -213,7 +232,7 @@ def montar(
         vistos.add((cod, num, a, face))
         por_item.setdefault(("gondola", num), []).append(
             {"c": cod, "n": r.get("produto_nome") or "", "loc": f"Face {face} · {ANDARES[a]}",
-             "q": somas.get(("g", cod, num, face, a)), "o": a * 10 + face}
+             "q": somas.get(("g", cod, num, face, a)), "o": a * 10 + face, "k": (a, face)}
         )
     vistos = set()
     for r in estantes:
@@ -229,18 +248,21 @@ def montar(
         loc = f"Nível {niv + 1}" if no_mapa == num else f"Seção {num} · Nível {niv + 1}"
         por_item.setdefault(("estante", no_mapa), []).append(
             {"c": cod, "n": r.get("produto_nome") or "", "loc": loc,
-             "q": somas.get(("e", cod, num, niv)), "o": num * 10 + niv}
+             "q": somas.get(("e", cod, num, niv)), "o": num * 10 + niv, "k": (num, niv)}
         )
 
     catalogo: dict[str, str] = {}
     itens = []
     for it in ITENS:
         prods = sorted(por_item.get((it["tipo"], it["n"]), []), key=lambda p: (p["o"], p["n"]))
+        ocupadas = len({p["k"] for p in prods})                   # faixas com ao menos um produto
         for p in prods:
             p.pop("o")
+            p.pop("k")
             if p["c"].strip():
                 catalogo.setdefault(p["c"], p["n"])
-        itens.append({**it, "rot": rotulo_curto(it), "nome": nome_estrutura(it), "prod": prods})
+        itens.append({**it, "rot": rotulo_curto(it), "nome": nome_estrutura(it), "prod": prods,
+                      "faixas": faixas(it), "ocupadas": min(ocupadas, faixas(it))})
 
     return {
         "loja": {"w": LOJA_W, "h": LOJA_H, "parede": PAREDE_ESP, "paredeH": PAREDE_H},
