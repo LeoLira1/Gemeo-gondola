@@ -680,7 +680,7 @@ function frame(now) {
   // rótulos com tamanho quase constante na tela (sem crescer no zoom nem sumir ao afastar)
   for (const s of rotulos) {
     const d = camera.position.distanceTo(s.getWorldPosition(tmpV));
-    s.material.visible = window.__rotulosOn !== false;
+    s.material.visible = window.__rotulosOn === true;
     const k = THREE.MathUtils.clamp(d * 0.03, 0.6, 1.5) * s.userData.base;
     if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2, 1); dirty = true; }
   }
