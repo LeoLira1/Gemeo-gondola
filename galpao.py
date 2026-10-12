@@ -267,3 +267,24 @@ def escada() -> dict:
         "patamar": ESCADA_PATAMAR,
         "lado": lado,
     }
+
+
+# ── Chuveiro lava-olhos (equipamento de emergência, referência) ─────────────
+# Fica na Parte 1, alinhado à Rua 2 e além do nº 25 (a oeste, na ponta da fileira), no ponto marcado no
+# desenho. A altura máxima é a de 2 níveis (palete + 2 racks). A distância até o nº 25 é estimativa.
+LAVA_OLHOS_PARTE = 1
+LAVA_OLHOS_REFERENCIA = 25
+LAVA_OLHOS_RECUO = 2.60          # da lateral do nº 25 até o pé do chuveiro
+LAVA_OLHOS_NIVEIS = 2
+
+
+def lava_olhos() -> dict:
+    p = POSICAO_POR_NUMERO[LAVA_OLHOS_REFERENCIA]
+    return {
+        "parte": LAVA_OLHOS_PARTE,
+        "x": round(p.x - p.tamanho_x / 2 - LAVA_OLHOS_RECUO, 4),
+        "z": round(p.z, 4),
+        "altura": round(PALETE_ALTURA + (LAVA_OLHOS_NIVEIS - 1) * PASSO_NIVEL + ALTURA_NIVEL, 4),
+        "niveis": LAVA_OLHOS_NIVEIS,
+        "rua": p.rua.numero,
+    }

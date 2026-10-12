@@ -20,6 +20,9 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 - **Escada para o mesanino (referência):** no Galpão Parte 1, paralela à Rua 1, com a base junto ao nº 14, subindo no
   sentido decrescente até o nº 11 e terminando na altura do 3º nível. Digite `escada` no campo Nº para ir até ela.
   Posição e altura vêm das posições da planta; largura (0,9 m) e folga estão em `galpao.py`.
+- **Chuveiro lava-olhos (referência):** equipamento de emergência verde na Parte 1, alinhado à Rua 2 e além do nº 25, com
+  altura de até 2 níveis (2,38 m). Digite `chuveiro` no campo Nº para ir até ele. A distância ao nº 25 é estimativa
+  (`galpao.py`).
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.
 - Quantidades em **unidades**, sem conversão.

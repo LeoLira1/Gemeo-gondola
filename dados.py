@@ -190,6 +190,7 @@ def montar(
         "divergencia": divergencia,
         "catalogo": [{"c": c, "n": n} for c, n in sorted(catalogo.items())],
         "escada": g.escada(),
+        "lavaolhos": g.lava_olhos(),
     }
 
 
