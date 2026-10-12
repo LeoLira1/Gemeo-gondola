@@ -233,3 +233,37 @@ def montar_saldos(
         enderecado = sum(enderecado_por_codigo.get(c, 0.0) for c in grupo)
         saldos[bruto] = Saldo(bruto, sistema, enderecado, tuple(grupo))
     return saldos
+
+
+# ── Escada para o mesanino (referência, não é endereço) ─────────────────────
+# Fica no Galpão Parte 1, paralela à Rua 1, do lado oposto ao corredor (o lado da parede). A base fica
+# junto ao nº 14 e a escada sobe no sentido decrescente da numeração, até o nº 11, terminando na
+# altura do 3º nível (topo do rack N3, palete incluído). Posição e altura vêm das posições da planta;
+# largura e folga são estimativas (ajustar aqui quando medir).
+PALETE_ALTURA = 0.12
+ESCADA_PARTE = 1
+ESCADA_DE, ESCADA_ATE = 14, 11
+ESCADA_LARGURA = 0.90
+ESCADA_FOLGA = 0.12        # entre a lateral do rack e a escada
+ESCADA_PATAMAR = 0.90      # plataforma no alto, antes do mesanino
+ESCADA_NIVEL_TOPO = 3
+
+
+def escada() -> dict:
+    """Retângulo da escada no chão (metros), altura do topo e comprimento do patamar."""
+    a, b = POSICAO_POR_NUMERO[ESCADA_DE], POSICAO_POR_NUMERO[ESCADA_ATE]
+    lado = 1 if a.rua.lado_corredor < 0 else -1            # oposto ao corredor
+    borda = a.x + lado * (a.tamanho_x / 2 + ESCADA_FOLGA)
+    x0, x1 = sorted((borda, borda + lado * ESCADA_LARGURA))
+    z_a, z_b = a.z, b.z
+    sentido = 1 if z_b > z_a else -1                       # a escada sobe do 14 para o 11
+    z_ini = z_a - sentido * a.tamanho_z / 2                # ponta do 14 (base)
+    z_fim = z_b + sentido * b.tamanho_z / 2                # ponta do 11 (topo)
+    return {
+        "parte": ESCADA_PARTE, "de": ESCADA_DE, "ate": ESCADA_ATE,
+        "x0": round(x0, 4), "x1": round(x1, 4), "z0": round(z_ini, 4), "z1": round(z_fim, 4),
+        "sentido": sentido,
+        "altura": round(PALETE_ALTURA + (ESCADA_NIVEL_TOPO - 1) * PASSO_NIVEL + ALTURA_NIVEL, 4),
+        "patamar": ESCADA_PATAMAR,
+        "lado": lado,
+    }

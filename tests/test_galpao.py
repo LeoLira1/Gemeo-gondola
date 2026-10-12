@@ -221,3 +221,30 @@ def test_ler_tudo_isola_o_mapa_que_falha(monkeypatch):
     t = ddg.ler_tudo("http://x", "t")
     assert "galpao" in t["erros"] and "loja" not in t["erros"]
     assert len(t["galpao"]["posicoes"]) == 129          # exemplo no lugar
+
+
+# ── Escada para o mesanino ──────────────────────────────────────────────────
+
+
+def test_escada_paralela_a_rua_1_do_14_ao_11():
+    e = g.escada()
+    p14, p11, p1 = g.POSICAO_POR_NUMERO[14], g.POSICAO_POR_NUMERO[11], g.POSICAO_POR_NUMERO[1]
+    assert e["parte"] == 1 and (e["de"], e["ate"]) == (14, 11)
+    # base junto ao 14 e topo junto ao 11: cobre as quatro posições 14, 13, 12 e 11
+    assert abs(e["z0"] - (p14.z - p14.tamanho_z / 2)) < 1e-6 and abs(e["z1"] - (p11.z + p11.tamanho_z / 2)) < 1e-6
+    assert e["sentido"] == 1 and e["z1"] > e["z0"]
+    # do lado oposto ao corredor (o corredor da Rua 1 fica a oeste, então a escada fica a leste dos racks)
+    assert g.POSICAO_POR_NUMERO[1].rua.lado_corredor == -1
+    assert e["x0"] > p14.x + p14.tamanho_x / 2 and e["lado"] == 1
+    assert abs((e["x1"] - e["x0"]) - g.ESCADA_LARGURA) < 1e-6
+    # termina na altura do 3º nível: palete + 2 passos de nível + um rack
+    assert abs(e["altura"] - (0.12 + 2 * g.PASSO_NIVEL + g.ALTURA_NIVEL)) < 1e-6
+    # não invade nenhum rack da Rua 1
+    for n in range(1, 15):
+        p = g.POSICAO_POR_NUMERO[n]
+        assert p.x + p.tamanho_x / 2 <= e["x0"]
+
+
+def test_escada_vai_no_json_do_galpao():
+    import dados as dde
+    assert dde.dados_exemplo()["escada"]["parte"] == 1
