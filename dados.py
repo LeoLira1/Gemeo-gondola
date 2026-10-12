@@ -422,13 +422,25 @@ def percentual(parte: float, todo: float) -> int:
     return int(100 * parte / todo + 0.5) if todo else 0
 
 
-def ocupacao_galpao(g_: dict[str, Any]) -> dict[str, int]:
-    """Vagas ocupadas (posições com ao menos um rack) e capacidade usada (racks ÷ posições × níveis)."""
-    posicoes = len(g_["posicoes"])
-    racks = sum(len(p) for p in g_["pilhas"].values())
+def ocupacao_galpao(g_: dict[str, Any]) -> dict[int, dict[str, int]]:
+    """Capacidade usada de CADA parte do galpão, separadas: racks ÷ (posições da parte × níveis).
+
+    Devolve {parte: {"racks", "capacidade" (em racks), "pct"}}.
+    """
+    niveis = g_["geo"]["niveisMax"]
+    parte_de = {p["n"]: p["p"] for p in g_["posicoes"]}
+    posicoes: dict[int, int] = {}
+    for parte in parte_de.values():
+        posicoes[parte] = posicoes.get(parte, 0) + 1
+    racks: dict[int, int] = {parte: 0 for parte in posicoes}
+    for n, pilha in g_["pilhas"].items():
+        parte = parte_de.get(int(n))
+        if parte is not None:
+            racks[parte] += len(pilha)
     return {
-        "vagas": percentual(len(g_["pilhas"]), posicoes),
-        "capacidade": percentual(racks, posicoes * g_["geo"]["niveisMax"]),
+        parte: {"racks": racks[parte], "capacidade": posicoes[parte] * niveis,
+                "pct": percentual(racks[parte], posicoes[parte] * niveis)}
+        for parte in sorted(posicoes)
     }
 
 
@@ -436,6 +448,25 @@ def ocupacao_barracao(b_: dict[str, Any]) -> int:
     return percentual(sum(1 for p in b_["pal"] if p["c"].strip()), len(b_["pal"]))
 
 
-def ocupacao_loja(l_: dict[str, Any]) -> int:
-    itens = [i for i in l_["itens"] if i["kind"] != "balcao"]
-    return percentual(sum(1 for i in itens if i["prod"]), len(itens))
+def ocupacao_loja(l_: dict[str, Any]) -> dict[str, int]:
+    """Faixas de endereço da loja (face × andar da gôndola, nível da estante) com ao menos um produto."""
+    total = sum(i["faixas"] for i in l_["itens"])
+    ocupadas = sum(i["ocupadas"] for i in l_["itens"])
+    return {"ocupadas": ocupadas, "total": total, "pct": percentual(ocupadas, total)}
+
+
+def capacidades(tudo: dict[str, Any]) -> list[dict[str, Any]]:
+    """A capacidade de cada área, independente das outras e em relação às SUAS vagas:
+    Galpão 1, Galpão 2, Barracão e Loja. Cada item: {nome, pct, dica, cor}."""
+    out = []
+    for parte, o in ocupacao_galpao(tudo["galpao"]).items():
+        out.append({"nome": f"Galpão {parte}", "pct": o["pct"], "cor": "#d8d4ca",
+                    "dica": f"Galpão {parte}: {o['racks']} racks de {o['capacidade']} (posições × {tudo['galpao']['geo']['niveisMax']} níveis)"})
+    b = tudo["barracao"]["pal"]
+    cheios = sum(1 for p in b if p["c"].strip())
+    out.append({"nome": "Barracão", "pct": percentual(cheios, len(b)), "cor": "#c99d66",
+                "dica": f"Barracão: {cheios} paletes com bag de {len(b)}"})
+    lj_ = ocupacao_loja(tudo["loja"])
+    out.append({"nome": "Loja", "pct": lj_["pct"], "cor": "#4caf50",
+                "dica": f"Loja: {lj_['ocupadas']} de {lj_['total']} faixas de endereço (gôndola: face × andar; estante: nível)"})
+    return out

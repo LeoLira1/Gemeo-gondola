@@ -279,20 +279,40 @@ def test_percentual_arredonda_e_protege_divisao_por_zero():
     assert ddp.percentual(5, 0) == 0
 
 
-def test_ocupacao_do_galpao_vagas_e_capacidade():
+def test_ocupacao_do_galpao_por_parte():
     import dados as ddp
-    out = ddp.montar(
-        [{"posicao": 1, "ordem": 1, "produto_codigo": "A", "produto_nome": "A", "quantidade": 1},
-         {"posicao": 1, "ordem": 2, "produto_codigo": "A", "produto_nome": "A", "quantidade": 1},
-         {"posicao": 2, "ordem": 1, "produto_codigo": "B", "produto_nome": "B", "quantidade": 1}],
-        [], {}, [])
-    oc = ddp.ocupacao_galpao(out)
-    assert oc["vagas"] == ddp.percentual(2, 129)          # 2 de 129 posições
-    assert oc["capacidade"] == ddp.percentual(3, 129 * 4)  # 3 racks de 516
+    # 2 racks na posição 1 e 1 na 2 (Parte 1); 1 na 86 (Parte 2)
+    linhas = [
+        {"posicao": 1, "ordem": 1, "produto_codigo": "A", "produto_nome": "A", "quantidade": 1},
+        {"posicao": 1, "ordem": 2, "produto_codigo": "A", "produto_nome": "A", "quantidade": 1},
+        {"posicao": 2, "ordem": 1, "produto_codigo": "B", "produto_nome": "B", "quantidade": 1},
+        {"posicao": 86, "ordem": 1, "produto_codigo": "C", "produto_nome": "C", "quantidade": 1},
+    ]
+    oc = ddp.ocupacao_galpao(ddp.montar(linhas, [], {}, []))
+    assert set(oc) == {1, 2}
+    assert oc[1] == {"racks": 3, "capacidade": 85 * 4, "pct": ddp.percentual(3, 340)}      # Parte 1: 85 posições
+    assert oc[2] == {"racks": 1, "capacidade": 44 * 4, "pct": ddp.percentual(1, 176)}      # Parte 2: 44 posições
 
 
-def test_ocupacao_barracao_e_loja_do_exemplo():
+def test_ocupacao_da_loja_por_faixas_de_endereco():
+    import loja as ljt, dados as ddp
+    # 12 gôndolas × 18 (3 andares × 6 faces) + estantes por nível + Estante Parede 6 × 6
+    out = ljt.montar([], [], [])
+    assert sum(i["faixas"] for i in out["itens"]) == 12 * 18 + (4 + 6 + 7 + 6 + 4 + 5 + 4 + 4) + 36
+    assert next(i for i in out["itens"] if i["kind"] == "balcao")["faixas"] == 0
+    # duas faces/andares na G7 (a mesma face e andar com 2 produtos conta uma vez) e um nível na E1
+    gond = [
+        {"produto_codigo": "A", "produto_nome": "A", "gondola_num": 7, "andar": 0, "pos_x": 0, "pos_z": 1},
+        {"produto_codigo": "B", "produto_nome": "B", "gondola_num": 7, "andar": 0, "pos_x": 0, "pos_z": 1},
+        {"produto_codigo": "A", "produto_nome": "A", "gondola_num": 7, "andar": 2, "pos_x": 0, "pos_z": 1},
+    ]
+    est = [{"produto_codigo": "A", "produto_nome": "A", "estante_num": 1, "nivel": 3}]
+    o = ddp.ocupacao_loja(ljt.montar(gond, est, []))
+    assert o["ocupadas"] == 3 and o["total"] == 292 and o["pct"] == ddp.percentual(3, 292)
+
+
+def test_capacidades_independentes_de_cada_area():
     import dados as ddp
-    b = ddp.barracao_exemplo()
-    assert ddp.ocupacao_barracao(b) == ddp.percentual(sum(1 for p in b["pal"] if p["c"]), 100)
-    assert 0 <= ddp.ocupacao_loja(ddp.loja_exemplo()) <= 100
+    caps = ddp.capacidades(ddp.tudo_exemplo())
+    assert [c["nome"] for c in caps] == ["Galpão 1", "Galpão 2", "Barracão", "Loja"]
+    assert all(0 <= c["pct"] <= 100 and c["dica"] for c in caps)
