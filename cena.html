@@ -231,15 +231,6 @@ if (D.escada) {
   rail.castShadow = true; rail.userData.escada = true; escada.grupo.add(rail); escada.malhas.push(rail);
   caixaE(xr - 0.02, xr + 0.02, H, H + hr, E.z1 - sent * 0.03, E.z1 - sent * 0.03 + sent * 0.04, corLat);                                    // poste do patamar
   scene.add(escada.grupo);
-  // etiqueta larga acima do patamar
-  const c = document.createElement("canvas"); c.width = 420; c.height = 80;
-  const g = c.getContext("2d");
-  g.fillStyle = "rgba(43,42,39,.88)"; g.beginPath(); g.roundRect ? g.roundRect(4, 8, 412, 64, 22) : g.rect(4, 8, 412, 64); g.fill();
-  g.fillStyle = "#fff"; g.font = "bold 36px system-ui, Segoe UI, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("ESCADA → MESANINO", 210, 42);
-  const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false }));
-  sp.scale.set(3.2, 3.2 * 80 / 420, 1); sp.renderOrder = 11; sp.position.set((E.x0 + E.x1) / 2, H + 1.0, E.z1);
-  escada.grupo.add(sp); escada.rotulo = sp;
   escada.caixa = { x: (E.x0 + E.x1) / 2, z: (E.z0 + E.z1) / 2, w: E.x1 - E.x0, d: L, h: H };
 }
 
@@ -629,10 +620,6 @@ function frame(now) {
     dirty = true;
   }
   // rótulos com tamanho quase constante na tela (sem crescer no zoom nem sumir ao afastar)
-  if (D.escada && escada.rotulo) {                       // etiqueta da escada: proporcional ao zoom
-    const k = THREE.MathUtils.clamp(camera.position.distanceTo(escada.rotulo.position) * 0.08, 1.3, 3.2);
-    if (Math.abs(escada.rotulo.scale.x - k) > 1e-3) { escada.rotulo.scale.set(k, (k * 80) / 420, 1); dirty = true; }
-  }
   for (const s of rotulos) {
     const d = camera.position.distanceTo(s.getWorldPosition(tmpV));
     s.material.visible = window.__rotulosOn !== false;
