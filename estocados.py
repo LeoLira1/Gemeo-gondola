@@ -158,14 +158,22 @@ def para_cena(linhas: list[dict[str, Any]] | None, galpao_racks: Iterable[dict[s
         [{"posicao": p, "ordem": r["o"], "codigo": r["c"], "nome": r["nome"]} for p, r in galpao_racks],
         [{"rotulo": e["rot"], "codigo": e["c"], "nome": e["n"]} for e in barracao_pal],
     )
-    itens = []
+    # Várias linhas do mesmo produto do mesmo cooperado (lotes, notas) viram UM item, com o saldo somado.
+    # A chave é o nome do palete (PRODUTO · COOPERADO), a mesma que liga o palete ao item.
+    por_nome: dict[str, dict[str, Any]] = {}
     for linha in linhas or []:
         i = item_de_linha(linha)
         if i.saldo <= 0:
             continue
-        itens.append({
-            "coop": i.cooperado, "prod": i.produto, "cod": i.codigo, "arm": i.armazem, "doc": i.documento,
-            "saldo": i.saldo, "nome": i.nome_do_palete, "codp": i.codigo_do_palete,
-            "end": enderecos.get(i.nome_do_palete, []),
-        })
+        item = por_nome.get(i.nome_do_palete)
+        if item is None:
+            por_nome[i.nome_do_palete] = {
+                "coop": i.cooperado, "prod": i.produto, "cod": i.codigo, "arm": i.armazem, "doc": i.documento,
+                "saldo": i.saldo, "n": 1, "nome": i.nome_do_palete, "codp": i.codigo_do_palete,
+                "end": enderecos.get(i.nome_do_palete, []),
+            }
+        else:
+            item["saldo"] += i.saldo
+            item["n"] += 1
+    itens = list(por_nome.values())
     return {"ok": linhas is not None, "itens": itens, "cor": COR_ESTOCADO}

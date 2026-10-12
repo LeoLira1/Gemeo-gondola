@@ -146,3 +146,22 @@ def test_catalogo_do_barracao_tem_um_estocado_por_cooperado():
         {"id": 3, "rotulo": "BAR-03", "pos_x": 500, "pos_z": 100, "produto_codigo": "123", "produto_nome": "C", "quantidade": 1},
     ])
     assert out["catalogo"] == [{"c": "123", "n": "C"}, {"c": "EST:9", "n": "A · ANA", "e": True}, {"c": "EST:9", "n": "A · BIA", "e": True}]
+
+
+def test_mesmo_produto_do_mesmo_cooperado_soma_o_saldo():
+    linhas = [
+        {"razao_social": "BRAVO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "40"},
+        {"razao_social": "BRAVO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "22"},
+        {"razao_social": "BRAVO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "107"},
+        {"razao_social": "OUTRO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "5"},
+        {"razao_social": "BRAVO", "descricao": "VANTACOR 5L", "codigo": "9", "saldo": "12"},
+        {"razao_social": "BRAVO", "descricao": "VANTACOR 5L", "codigo": "9", "saldo": "0"},  # saldo 0 não conta
+    ]
+    racks = [(7, {"o": 1, "c": "EST:254185", "nome": "BORAL 20L · BRAVO"})]
+    itens = es.para_cena(linhas, racks, [])["itens"]
+    por = {(i["coop"], i["prod"]): i for i in itens}
+    assert len(itens) == 3
+    b = por[("BRAVO", "BORAL 20L")]
+    assert (b["saldo"], b["n"], b["end"]) == (169, 3, ["Galpão 7 · N1"])  # 40 + 22 + 107, um endereço só
+    assert por[("OUTRO", "BORAL 20L")]["saldo"] == 5 and por[("OUTRO", "BORAL 20L")]["end"] == []
+    assert por[("BRAVO", "VANTACOR 5L")]["n"] == 1
