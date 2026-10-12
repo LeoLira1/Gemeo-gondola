@@ -33,7 +33,7 @@
   const g = document.createElement("button");
   g.id = "bGirar"; g.className = "btn"; g.textContent = "⟳"; g.title = "Girar a maquete lentamente";
   const ligar = (on) => {
-    controls.autoRotate = on; controls.autoRotateSpeed = 0.6; g.classList.toggle("on", on); dirty = true;
+    controls.autoRotate = on; controls.autoRotateSpeed = 1.2; g.classList.toggle("on", on); dirty = true;
     try { sessionStorage.setItem("camda_girar", on ? "1" : "0"); } catch (e) {}
   };
   g.onclick = () => ligar(!controls.autoRotate);
