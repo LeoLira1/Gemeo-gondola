@@ -36,6 +36,8 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 .btn.off { color: var(--muted); background: rgba(255,255,255,.6); text-decoration: line-through; text-decoration-color: rgba(0,0,0,.25); }
 #msg { color: var(--muted); font-size: 12px; padding: 0 4px; }
 #msg b { color: var(--hit); }
+#msg a { color: var(--hit); font-weight: 700; text-decoration: none; border-bottom: 1px dashed currentColor; cursor: pointer; }
+#msg a:hover { background: rgba(46,158,79,.1); }
 
 /* rodapé: legenda recolhível + resumo */
 #legend { position: absolute; left: 12px; bottom: 64px; padding: 10px 14px; display: flex; gap: 8px 16px; flex-wrap: wrap;

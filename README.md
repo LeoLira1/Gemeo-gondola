@@ -14,6 +14,9 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 - **Barracão:** a estrutura de 35 × 10 m (paredes de 6 m, porta, portão e porta na parede da frente) com os paletes
   e bags de `barracao_enderecos` (BAR-01 … BAR-100). Chips por fileira, busca por `BAR7` e por produto, e botão
   para alternar paredes reais / em corte. Sem linhas na tabela, mostra o layout padrão do Gondolas, todo livre.
+- **Busca global:** o campo de produto de qualquer mapa procura no galpão, na loja e no barracão. O resumo mostra
+  quantos locais há em cada mapa (`Galpão 3 · Loja 2 → · Barracão 1 →`), as setas abrem o outro mapa já com a busca, e a
+  busca acompanha você ao trocar de aba. Os três mapas são lidos juntos (uma consulta ao Turso, cache de 60 s).
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.
 - Quantidades em **unidades**, sem conversão.

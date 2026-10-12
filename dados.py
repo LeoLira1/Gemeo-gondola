@@ -192,10 +192,7 @@ def montar(
     }
 
 
-def ler_turso(url: str, token: str) -> dict[str, Any]:
-    racks, posicoes, mestre, mapa, mapa_cod, end = consultar(
-        url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO]
-    )
+def _montar_galpao_de(racks, posicoes, mestre, mapa, mapa_cod, end) -> dict[str, Any]:
     if racks is None or mestre is None or end is None:
         raise TursoErro("não consegui ler galpao_racks / estoque_mestre / estoque_localizado")
 
@@ -210,6 +207,12 @@ def ler_turso(url: str, token: str) -> dict[str, Any]:
     dados = montar(racks, mestre, vinculos, end)
     dados["avisos"] = _avisos_planta(posicoes)
     return dados
+
+
+def ler_turso(url: str, token: str) -> dict[str, Any]:
+    return _montar_galpao_de(
+        *consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO])
+    )
 
 
 def _avisos_planta(linhas: list[dict[str, Any]] | None) -> list[str]:
@@ -360,3 +363,50 @@ def barracao_exemplo() -> dict[str, Any]:
         linhas.append({"id": i + 1, "rotulo": p["rot"], "pos_x": p["x"], "pos_z": p["z"],
                        "produto_codigo": cod, "produto_nome": nome, "quantidade": rnd.choice([1, 1, 2, 4]) if cod else 0})
     return br.montar(linhas)
+
+
+# ── Busca global: um índice com o produto de cada local, nos três mapas ─────
+
+
+def indice_global(galpao: dict[str, Any], loja: dict[str, Any], barracao: dict[str, Any]) -> list[dict[str, Any]]:
+    """Uma linha por produto em cada local: {c: código, n: nome, a: mapa, w: local}.
+
+    É o que deixa a busca de qualquer aba achar o produto em TODOS os mapas.
+    """
+    out: list[dict[str, Any]] = []
+    for pos, pilha in galpao["pilhas"].items():
+        for r in pilha:
+            if r["c"].strip():
+                out.append({"c": r["c"], "n": r["nome"], "a": "galpao", "w": pos})
+    for it in loja["itens"]:
+        for p in it["prod"]:
+            if p["c"].strip():
+                out.append({"c": p["c"], "n": p["n"], "a": "loja", "w": it["rot"]})
+    for p in barracao["pal"]:
+        if p["c"].strip():
+            out.append({"c": p["c"], "n": p["n"], "a": "barracao", "w": p["rot"]})
+    return out
+
+
+def ler_tudo(url: str, token: str) -> dict[str, Any]:
+    """Galpão, loja e barracão numa ida só ao Turso. Um mapa que falha vira dados de exemplo
+    (anotado em `erros`), sem derrubar os outros."""
+    res = consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO,
+                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO])
+    erros: dict[str, str] = {}
+    try:
+        galpao = _montar_galpao_de(*res[:6])
+    except TursoErro as e:
+        galpao, erros["galpao"] = dados_exemplo(), str(e)
+    gond, est, qtd, barr = res[6:]
+    if gond is None or est is None:
+        loja, erros["loja"] = loja_exemplo(), "não consegui ler gondola_layout / estante_layout"
+    else:
+        loja = lj.montar(gond, est, qtd or [])
+        loja["avisos"] = [] if qtd is not None else ["estoque_localizado não pôde ser lida; as quantidades da loja não aparecem."]
+    barracao = br.montar(barr)
+    return {"galpao": galpao, "loja": loja, "barracao": barracao, "erros": erros}
+
+
+def tudo_exemplo() -> dict[str, Any]:
+    return {"galpao": dados_exemplo(), "loja": loja_exemplo(), "barracao": barracao_exemplo(), "erros": {}}
