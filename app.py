@@ -60,28 +60,28 @@ def _segredo(nome: str) -> str | None:
 
 
 @st.cache_data(ttl=60, show_spinner="Lendo o Turso…")
-def ler_banco(url: str, token: str, mapa: str) -> tuple[dict, str]:
-    """Lê o mapa pedido. Só é cacheado quando dá certo (exceção não entra no cache)."""
-    ler = {"galpao": dd.ler_turso, "loja": dd.ler_loja, "barracao": dd.ler_barracao}[mapa]
-    return ler(url, token), datetime.now().strftime("%H:%M:%S")
+def ler_banco(url: str, token: str) -> tuple[dict, str]:
+    """Lê os três mapas de uma vez (a busca é global). Só é cacheado quando dá certo."""
+    return dd.ler_tudo(url, token), datetime.now().strftime("%H:%M:%S")
 
 
-def carregar(mapa: str) -> tuple[dict, str | None, str | None]:
-    """(dados, hora da leitura, motivo do fallback). Motivo != None → dados de exemplo."""
-    exemplo = {"galpao": dd.dados_exemplo, "loja": dd.loja_exemplo, "barracao": dd.barracao_exemplo}[mapa]
+def carregar() -> tuple[dict, str | None, str | None]:
+    """(dados dos três mapas, hora da leitura, motivo do fallback). Motivo != None → dados de exemplo."""
     url, token = _segredo("TURSO_URL"), _segredo("TURSO_TOKEN")
     if not url or not token:
-        return exemplo(), None, "TURSO_URL / TURSO_TOKEN não configurados em st.secrets"
+        return dd.tudo_exemplo(), None, "TURSO_URL / TURSO_TOKEN não configurados em st.secrets"
     try:
-        dados, hora = ler_banco(url, token, mapa)
-        return dados, hora, None
+        tudo, hora = ler_banco(url, token)
+        return tudo, hora, None
     except dd.TursoErro as e:
-        return exemplo(), None, str(e)
+        return dd.tudo_exemplo(), None, str(e)
     except Exception as e:  # resposta inesperada: nunca vaza URL nem token
-        return exemplo(), None, f"erro ao ler o Turso ({type(e).__name__})"
+        return dd.tudo_exemplo(), None, f"erro ao ler o Turso ({type(e).__name__})"
 
 
-def cena_html(dados: dict, mapa: str) -> str:
+def cena_html(dados: dict, mapa: str, indice: list) -> str:
+    # a cena recebe o índice global de produtos e qual mapa ela é (busca em todos os mapas)
+    dados = {**dados, "global": indice, "area": mapa}
     # `</` quebraria o <script>; U+2028/2029 quebram strings JS antigas.
     payload = (
         json.dumps(dados, ensure_ascii=False, separators=(",", ":"))
@@ -109,7 +109,9 @@ if hasattr(st, "segmented_control"):
 else:
     escolha = c_mapa.radio("Mapa", list(MAPAS), horizontal=True, label_visibility="collapsed")
 mapa = MAPAS[escolha]
-dados, hora, motivo = carregar(mapa)
+tudo, hora, motivo = carregar()
+dados = tudo[mapa]
+motivo = motivo or tudo["erros"].get(mapa)
 
 with c_btn:
     if st.button("↻ Atualizar", use_container_width=True):
@@ -162,7 +164,7 @@ if motivo:
 for aviso in dados.get("avisos", []):
     st.info(aviso)
 
-html_cena = cena_html(dados, mapa)
+html_cena = cena_html(dados, mapa, dd.indice_global(tudo["galpao"], tudo["loja"], tudo["barracao"]))
 if hasattr(st, "iframe"):
     # components.v1.html está marcado para remoção nas versões novas do Streamlit
     st.iframe(html_cena, height=ALTURA_MAPA)

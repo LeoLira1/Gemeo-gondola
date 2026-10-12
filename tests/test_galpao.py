@@ -194,3 +194,30 @@ def test_barracao_exemplo():
     import dados as ddb
     d = ddb.barracao_exemplo()
     assert len(d["pal"]) == 100 and any(p["c"] for p in d["pal"]) and any(not p["c"] for p in d["pal"])
+
+
+# ── Busca global ────────────────────────────────────────────────────────────
+
+
+def test_indice_global_junta_os_tres_mapas():
+    import dados as ddg
+    t = ddg.tudo_exemplo()
+    idx = ddg.indice_global(t["galpao"], t["loja"], t["barracao"])
+    areas = {e["a"] for e in idx}
+    assert areas == {"galpao", "loja", "barracao"}
+    assert all(e["c"].strip() and "n" in e and "w" in e for e in idx)
+    # um mesmo produto aparece em mais de um mapa (é isso que a busca global resume)
+    por_codigo: dict[str, set] = {}
+    for e in idx:
+        por_codigo.setdefault(e["c"], set()).add(e["a"])
+    assert any(len(a) == 3 for a in por_codigo.values())
+
+
+def test_ler_tudo_isola_o_mapa_que_falha(monkeypatch):
+    import dados as ddg
+    # galpão sem leitura (racks None) → só ele vira exemplo; os outros seguem
+    res = [None, None, None, None, None, None, [], [], [], []]
+    monkeypatch.setattr(ddg, "consultar", lambda url, token, sqls: res)
+    t = ddg.ler_tudo("http://x", "t")
+    assert "galpao" in t["erros"] and "loja" not in t["erros"]
+    assert len(t["galpao"]["posicoes"]) == 129          # exemplo no lugar
