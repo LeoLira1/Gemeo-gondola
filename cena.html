@@ -11,7 +11,7 @@
   <div id="top">
     <div class="row">
       <div class="panel seg" id="partes"></div>
-      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129" autocomplete="off"></div>
+      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129 ou escada" autocomplete="off"></div>
       <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
       <span id="msg"></span>
     </div>
@@ -24,6 +24,7 @@
     <span><i style="background:#1565C0"></i>Endereçado além do sistema</span>
     <span><i style="background:#2e9e4f"></i>Produto buscado</span>
     <span><i style="background:transparent;border:1px dashed #8d8b85"></i>Vaga livre</span>
+    <span><i style="background:#cfd3d8"></i>Escada p/ mesanino</span>
   </div>
   <div id="stats" class="panel"></div>
   <div id="tip"></div>
@@ -91,6 +92,12 @@ function boxGeo(w, h, d) {
 function edgesGeo(w, h, d) {
   const k = "e" + [w, h, d].join();
   return (geoCache[k] ||= new THREE.EdgesGeometry(boxGeo(w, h, d)));
+}
+
+// caixa em um grupo, sem depender do chão
+function addBoxTo(grupo, x0, x1, y0, y1, z0, z1, cor) {
+  const m = new THREE.Mesh(boxGeo(x1 - x0, y1 - y0, z1 - z0), mat(cor));
+  m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); m.castShadow = m.receiveShadow = true; grupo.add(m); return m;
 }
 
 // Laje do chão (uma só, redimensionada por parte)
@@ -201,6 +208,32 @@ for (const r of D.ruas) {
   rotulosRua.set(r.n, s);
 }
 
+// Escada para o mesanino: referência (não é endereço). Parte 1, paralela à Rua 1, sobe do nº 14 ao nº 11.
+const escada = { grupo: new THREE.Group(), malhas: [], d: D.escada };
+if (D.escada) {
+  const E = D.escada, cor = 0xcfd3d8, corLat = 0x8b95a1;
+  const L = Math.abs(E.z1 - E.z0), sent = E.sentido, H = E.altura, pat = E.patamar;
+  const n = 18, run = (L - pat) / n;                              // degraus de ~24 cm de pisada
+  const zDe = (i) => E.z0 + sent * i * run;
+  const caixaE = (x0, x1, y0, y1, za, zb, c) => {
+    const m = addBoxTo(escada.grupo, x0, x1, y0, y1, Math.min(za, zb), Math.max(za, zb), c);
+    m.userData.escada = true; escada.malhas.push(m); return m;
+  };
+  for (let i = 0; i < n; i++) caixaE(E.x0, E.x1, 0, ((i + 1) * H) / (n + 1), zDe(i), zDe(i + 1), cor);    // degraus (blocos cheios)
+  caixaE(E.x0, E.x1, H - 0.1, H, zDe(n), E.z1, 0xe2e5e9);                                                  // patamar
+  for (const x of [E.x0 + 0.05, E.x1 - 0.05]) caixaE(x - 0.04, x + 0.04, 0, H - 0.1, E.z1 - sent * 0.06, E.z1 - sent * 0.14, corLat);   // pés do patamar
+  // corrimão no lado aberto (o do corredor): postes + barra inclinada que segue os degraus
+  const xr = E.lado > 0 ? E.x0 + 0.03 : E.x1 - 0.03, hr = 0.95;
+  for (let i = 0; i <= n; i += 3) caixaE(xr - 0.02, xr + 0.02, (Math.min(i + 1, n) * H) / (n + 1), (Math.min(i + 1, n) * H) / (n + 1) + hr, zDe(i) - 0.02, zDe(i) + 0.02, corLat);
+  const dz = (n * run) * sent, dy = H - H / (n + 1), len = Math.hypot(dz, dy);
+  const rail = new THREE.Mesh(boxGeo(0.05, 0.05, len), mat(corLat));
+  rail.position.set(xr, H / (n + 1) + hr + dy / 2, E.z0 + dz / 2); rail.rotation.x = -Math.atan2(dy, Math.abs(dz)) * sent;
+  rail.castShadow = true; rail.userData.escada = true; escada.grupo.add(rail); escada.malhas.push(rail);
+  caixaE(xr - 0.02, xr + 0.02, H, H + hr, E.z1 - sent * 0.03, E.z1 - sent * 0.03 + sent * 0.04, corLat);                                    // poste do patamar
+  scene.add(escada.grupo);
+  escada.caixa = { x: (E.x0 + E.x1) / 2, z: (E.z0 + E.z1) / 2, w: E.x1 - E.x0, d: L, h: H };
+}
+
 // Seleção (busca por número) e destaque de hover
 const selGrupo = new THREE.Group();
 const selFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -253,6 +286,11 @@ function atualizarVisibilidade() {
     const r = D.ruas.find((x) => x.n === n);
     s.visible = r.p === state.parte;
   }
+  if (D.escada) {                                      // referência: sempre visível na parte dela, mesmo com filtro de rua
+    const naParteEscada = state.parte === D.escada.parte;
+    escada.grupo.visible = naParteEscada;
+    if (naParteEscada) alvos.push(...escada.malhas);
+  }
   dirty = true;
 }
 
@@ -263,6 +301,10 @@ function envelope(filtro) {
     if (!filtro(p)) continue;
     a.minX = Math.min(a.minX, p.x - p.sx / 2); a.maxX = Math.max(a.maxX, p.x + p.sx / 2);
     a.minZ = Math.min(a.minZ, p.z - p.sz / 2); a.maxZ = Math.max(a.maxZ, p.z + p.sz / 2);
+  }
+  if (D.escada && filtro({ p: D.escada.parte, r: 1 })) {     // a escada também entra no enquadramento
+    a.minX = Math.min(a.minX, D.escada.x0); a.maxX = Math.max(a.maxX, D.escada.x1);
+    a.minZ = Math.min(a.minZ, D.escada.z0, D.escada.z1); a.maxZ = Math.max(a.maxZ, D.escada.z0, D.escada.z1);
   }
   return a;
 }
@@ -400,6 +442,13 @@ function atualizarSelecao() {
   mostrarInfo(c);
   dirty = true;
 }
+function irParaEscada() {
+  if (!D.escada) return;
+  state.sel = null; state.parte = D.escada.parte; state.rua = null;
+  refrescar();
+  const cx = escada.caixa, alvo = new THREE.Vector3(cx.x, cx.h / 2, cx.z);
+  voarPara(alvo, alvo.clone().addScaledVector(DIR, 17));
+}
 function irParaPosicao(n) {
   const c = casas.get(n);
   if (!c) return;
@@ -432,6 +481,7 @@ $("qNum").addEventListener("input", () => {
     if (!v) { state.sel = null; refrescar(); return; }
     const n = parseInt(v, 10);
     if (/^\d+$/.test(v) && posPorN.has(n)) irParaPosicao(n);
+    else if (/^esc/i.test(v)) irParaEscada();
   }, 350);
 });
 $("qNum").addEventListener("keydown", (e) => {
@@ -439,6 +489,7 @@ $("qNum").addEventListener("keydown", (e) => {
   clearTimeout(tNum);
   const n = parseInt($("qNum").value, 10);
   if (posPorN.has(n)) irParaPosicao(n);
+  else if (/^esc/i.test($("qNum").value.trim())) irParaEscada();
 });
 
 // ── Busca por produto ───────────────────────────────────────────────────────
@@ -491,10 +542,17 @@ function verHover() {
   const hit = ray.intersectObjects(alvos, false)[0];
   if (!hit) { tip.style.display = "none"; hoverBox.visible = false; canvas.style.cursor = ""; dirty = true; return; }
   const o = hit.object, ud = o.userData, c = casas.get(ud.n);
-  canvas.style.cursor = "pointer";
+  canvas.style.cursor = ud.escada ? "help" : "pointer";
   tip.textContent = "";
   const t = (tag, txt, cls) => { const el = document.createElement(tag); el.textContent = txt; if (cls) el.className = cls; tip.appendChild(el); return el; };
-  if (ud.rack) {
+  if (ud.escada) {
+    const E = D.escada, cx = escada.caixa;
+    t("b", "Escada → mesanino");
+    t("div", `Referência · sobe do nº ${E.de} ao nº ${E.ate}, paralela à Rua 1`, "s");
+    t("div", `Chega na altura do ${3}º nível (${fmt.format(E.altura)} m)`, "s");
+    hoverBox.scale.set(cx.w + 0.06, cx.h + 0.06, cx.d + 0.06);
+    hoverBox.position.set(cx.x, cx.h / 2, cx.z);
+  } else if (ud.rack) {
     const r = ud.rack;
     t("b", `${ud.n} · N${ud.o}`);
     tip.appendChild(document.createElement("br"));
@@ -531,7 +589,7 @@ canvas.addEventListener("click", (e) => {
   mouse.set(((e.clientX - rc.left) / rc.width) * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
   ray.setFromCamera(mouse, camera);
   const hit = ray.intersectObjects(alvos, false)[0];
-  if (hit && !moveu) { state.sel = hit.object.userData.n; $("qNum").value = String(state.sel); atualizarSelecao(); pintar(); }
+  if (hit && !moveu && hit.object.userData.n) { state.sel = hit.object.userData.n; $("qNum").value = String(state.sel); atualizarSelecao(); pintar(); }
 });
 let moveu = false, down = null;
 canvas.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; moveu = false; });
@@ -580,7 +638,7 @@ redimensionar();
 refrescar();
 enquadrarVista(false);
 requestAnimationFrame(frame);
-window.__galpao = { state, casas, D, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
+window.__galpao = { state, casas, D, escada, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
 /*__UI_JS__*/
 </script>
 </body>

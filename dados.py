@@ -189,6 +189,7 @@ def montar(
         "pilhas": {str(n): sorted(p, key=lambda r: r["o"]) for n, p in pilhas.items()},
         "divergencia": divergencia,
         "catalogo": [{"c": c, "n": n} for c, n in sorted(catalogo.items())],
+        "escada": g.escada(),
     }
 
 
