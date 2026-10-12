@@ -48,7 +48,6 @@ então **não entra na conta de estoque da loja** (saldo, baixa pela contagem, M
 - **Campo Produto:** também procura nos estocados (cooperado, produto ou código), inclusive itens sem endereço, e mostra
   `Estocados N itens (M sem endereço) →`; o link abre a lista já filtrada.
 - **Mapa:** paletes de estocado em violeta (`#8B5CF6`).
-- **Chip do galpão:** `38 livres · 30 estocados · 61 loja` (parte zerada some); vagas = posições × níveis (129 × 4 = 516).
 - **Somente leitura:** lançar, ajustar e "Retirar do endereço" continuam no app Flutter Gôndolas; este app não escreve
   no banco. Quem um dia escrever aqui deve checar `deve_espelhar(codigo)` antes de gravar em `estoque_localizado`.
 - Se `materiais_terceiros` não puder ser lida, a lista fica vazia e o app avisa; o resto segue.
