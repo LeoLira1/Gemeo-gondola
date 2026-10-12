@@ -109,7 +109,7 @@
       h += `<div class="coop">${esc(coop || "(sem cooperado)")}</div>`;
       for (const i of lista) {
         const onde = i.end.length ? "📍 " + i.end.map(esc).join(" · ") : "sem endereço";
-        h += `<div class="it"><div>${esc(i.prod)}<br><span class="onde${i.end.length ? "" : " sem"}">${onde}</span></div><b>${fmtN.format(i.saldo)}</b></div>`;
+        h += `<div class="it"><div>${esc(i.prod)}${i.n > 1 ? ` <span class="onde sem">· ${i.n} lançamentos</span>` : ""}<br><span class="onde${i.end.length ? "" : " sem"}">${onde}</span></div><b>${fmtN.format(i.saldo)}</b></div>`;
       }
     }
     $("estLista").innerHTML = h || `<div class="sub">${D.estocados.ok ? "Nenhum item encontrado." : "materiais_terceiros indisponível."}</div>`;
