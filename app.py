@@ -82,9 +82,10 @@ def carregar() -> tuple[dict, str | None, str | None]:
         return dd.tudo_exemplo(), None, f"erro ao ler o Turso ({type(e).__name__})"
 
 
-def cena_html(dados: dict, mapa: str, indice: list) -> str:
-    # a cena recebe o índice global de produtos e qual mapa ela é (busca em todos os mapas)
-    dados = {**dados, "global": indice, "area": mapa}
+def cena_html(dados: dict, mapa: str, indice: list, estocados: dict) -> str:
+    # a cena recebe o índice global de produtos, qual mapa ela é (busca em todos os mapas)
+    # e a lista de estocados (material de cooperado, fora do saldo)
+    dados = {**dados, "global": indice, "area": mapa, "estocados": estocados}
     # `</` quebraria o <script>; U+2028/2029 quebram strings JS antigas.
     payload = (
         json.dumps(dados, ensure_ascii=False, separators=(",", ":"))
@@ -136,7 +137,8 @@ def _stat(rotulo: str, valor: object, cor: str | None = None) -> str:
 if mapa == "galpao":
     pilhas = dados["pilhas"]
     total = len(dados["posicoes"])
-    chips = [_stat(f"de {total} posições com carga", len(pilhas))]
+    chips = [_stat(f"de {total} posições com carga", len(pilhas)),
+             _stat(f"· de {total * dados['geo']['niveisMax']} vagas", dd.resumo_galpao(dados), "#8B5CF6")]
 elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]
@@ -165,8 +167,10 @@ if motivo:
     st.warning(f"Mostrando DADOS DE EXEMPLO — {motivo}.", icon="⚠️")
 for aviso in dados.get("avisos", []):
     st.info(aviso)
+if not tudo["estocados"]["ok"] and not motivo:
+    st.info("materiais_terceiros não pôde ser lida; a lista de Produtos estocados está vazia.")
 
-html_cena = cena_html(dados, mapa, dd.indice_global(tudo["galpao"], tudo["loja"], tudo["barracao"]))
+html_cena = cena_html(dados, mapa, dd.indice_global(tudo["galpao"], tudo["loja"], tudo["barracao"]), tudo["estocados"])
 if hasattr(st, "iframe"):
     # components.v1.html está marcado para remoção nas versões novas do Streamlit
     st.iframe(html_cena, height=ALTURA_MAPA)
