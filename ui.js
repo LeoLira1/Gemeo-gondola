@@ -121,4 +121,33 @@
   painel.querySelector(".x").onclick = () => b.click();
   $("qEst").addEventListener("input", desenhar);
   (linha || $("top")).insertBefore(b, msg || null);
+
+  // O campo Produto também procura nos estocados (cooperado, produto ou código), inclusive os sem endereço,
+  // que nenhuma busca por palete enxerga. Acrescenta ao resumo da busca e abre o painel já filtrado.
+  const campo = $("qProd");
+  if (!campo || !msg) return;
+  let t = null;
+  campo.addEventListener("input", () => {
+    clearTimeout(t);
+    t = setTimeout(() => {                                   // depois do resumo da cena e do resumo global
+      const termos = dobra(campo.value).trim().split(/\s+/).filter(Boolean);
+      if (dobra(campo.value).trim().length < 2) return;
+      const achados = itens.filter((i) => termos.every((x) => i.k.includes(x)));
+      if (!achados.length) return;
+      const sem = achados.filter((i) => !i.end.length).length;
+      const coops = new Set(achados.map((i) => i.coop)).size;
+      msg.insertAdjacentHTML("beforeend",
+        ` · <a href="#" data-est="1" style="color:${D.estocados.cor}" title="Abrir a lista de estocados com esta busca">` +
+        `Estocados ${achados.length} iten${achados.length === 1 ? "" : "s"}` +
+        `${coops > 1 ? " de " + coops + " cooperados" : ""}${sem ? " (" + sem + " sem endereço)" : ""} →</a>`);
+    }, 420);
+  });
+  msg.addEventListener("click", (ev) => {
+    const a = ev.target.closest("a[data-est]");
+    if (!a) return;
+    ev.preventDefault();
+    $("qEst").value = campo.value;
+    if (painel.style.display === "none") b.click(); else desenhar();
+  });
+  if (campo.value) campo.dispatchEvent(new Event("input"));
 })();
