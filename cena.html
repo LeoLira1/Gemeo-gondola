@@ -580,8 +580,19 @@ function envelope(filtro) {
 // virada para dentro: vista de fora, a parede mais próxima da câmera some e não tapa os racks.
 const PAREDES = { parte: 2, altura: 5.0 };
 const paredes = new THREE.Group();
-const matParede = new THREE.MeshStandardMaterial({ color: 0xe9e6de, roughness: 1, side: THREE.FrontSide });
-const linhaParede = new THREE.LineBasicMaterial({ color: 0x1565C0 });
+const matParede = new THREE.MeshStandardMaterial({ color: 0xdad4c9, roughness: 1, metalness: 0, side: THREE.FrontSide });
+// Reboco de cimento sem pintura (ambientCG Plaster003, CC0). As imagens vêm embutidas (data URI) pelo app.py.
+const TEX_PAREDE = /*__TEX_PAREDE__*/null;
+const TAM_TEX_PAREDE = 2.2;   // um bloco de textura a cada ~2,2 m
+if (TEX_PAREDE) {
+  const carregar = (url, extra) => new THREE.TextureLoader().load(url, (t) => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; Object.assign(t, extra);
+    matParede.needsUpdate = true; dirty = true;
+  });
+  matParede.map = carregar(TEX_PAREDE.cor);
+  matParede.normalMap = carregar(TEX_PAREDE.normal);
+  matParede.normalScale.set(0.9, 0.9);
+}
 scene.add(paredes);
 function montarParedes(x0, x1, z0, z1) {
   paredes.clear();
@@ -593,9 +604,11 @@ function montarParedes(x0, x1, z0, z1) {
     [x1, (z0 + z1) / 2, z1 - z0, -Math.PI / 2],      // ponta X+
   ];
   for (const [cx, cz, len, ry] of lados) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, H), matParede);
+    const geo = new THREE.PlaneGeometry(len, H);
+    const uv = geo.attributes.uv;                   // textura em escala real: repete a cada TAM_TEX_PAREDE metros
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * len / TAM_TEX_PAREDE, uv.getY(i) * H / TAM_TEX_PAREDE);
+    const m = new THREE.Mesh(geo, matParede);
     m.position.set(cx, H / 2, cz); m.rotation.y = ry; m.receiveShadow = true;
-    m.add(new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), linhaParede));
     paredes.add(m);
   }
   paredes.visible = state.parte === PAREDES.parte;
@@ -1001,8 +1014,8 @@ function frame(now) {
 
 // ── Piso: "cimento" (padrão) ou "branco" — só visual, escolha salva no localStorage ──
 const PISO = {
-  cimento: { cor: 0xc9c9c6, mapa: cimentoTex, hemi: 0.7, sol: 0.62, vagaCor: 0xf1efe9, vagaOp: 0.7, linha: 0x55544f, fraca: 0x9b9a95, borda: 0x8a8984 },
-  branco: { cor: 0xf8f6f1, mapa: null, hemi: 0.74, sol: 0.54, vagaCor: 0xe6e2d9, vagaOp: 0.45, linha: 0x9a9892, fraca: 0xc9c5bb, borda: 0xcfcbc1 },
+  cimento: { parede: 0xdad4c9, cor: 0xc9c9c6, mapa: cimentoTex, hemi: 0.7, sol: 0.62, vagaCor: 0xf1efe9, vagaOp: 0.7, linha: 0x55544f, fraca: 0x9b9a95, borda: 0x8a8984 },
+  branco: { parede: 0xf0ece4, cor: 0xf8f6f1, mapa: null, hemi: 0.74, sol: 0.54, vagaCor: 0xe6e2d9, vagaOp: 0.45, linha: 0x9a9892, fraca: 0xc9c5bb, borda: 0xcfcbc1 },
 };
 const luzHemi = scene.children.find((o) => o.isHemisphereLight);
 const btnPiso = document.createElement("button");
@@ -1010,6 +1023,7 @@ btnPiso.id = "bPiso"; btnPiso.className = "btn";
 $("wrap").appendChild(btnPiso);
 function aplicarPiso(modo) {
   const p = PISO[modo] || PISO.cimento;
+  matParede.color.setHex(p.parede);
   M.laje.color.setHex(p.cor); M.laje.map = p.mapa; M.laje.roughness = 1; M.laje.metalness = 0; M.laje.needsUpdate = true;
   luzHemi.intensity = p.hemi; sun.intensity = p.sol;
   M.vaga.color.setHex(p.vagaCor); M.vaga.opacity = p.vagaOp;
