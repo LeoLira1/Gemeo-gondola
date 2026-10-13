@@ -579,7 +579,7 @@ function envelope(filtro) {
 // mais próxima da câmera some e não tapa os racks (a frente do Galpão 1 deixa um "fantasma" translúcido para ver o vão).
 // Galpão 1: a frente (Z+) é fechada, com um vão (medidas em metros, na planta dos racks, centrado na paleteira).
 // Galpão 2: a frente (Z+, lado da mesa) é toda aberta.
-const PAREDES = { altura: 5.0, margem: 0.7, frente: { 1: { vao: [2.4, 6.8] }, 2: null } };
+const PAREDES = { altura: { 1: 6.0, 2: 5.0 }, margem: 0.7, frente: { 1: { vao: [2.4, 6.8] }, 2: null } };
 const paredes = new THREE.Group();
 const matParede = new THREE.MeshStandardMaterial({ color: 0xdad4c9, roughness: 1, metalness: 0, side: THREE.FrontSide });
 // Texturas (ambientCG, CC0): reboco cru nas paredes (Plaster002) e cimento no piso (Concrete034).
@@ -598,10 +598,30 @@ if (TEXTURAS) {
   matParede.normalScale.set(0.9, 0.9);
 }
 scene.add(paredes);
+// Porta metálica laminada (veneziana) no fim da escada, na parede do lado dela, na altura do patamar.
+const PORTA = { largura: 0.90, altura: 2.10, batente: 0.06 };
+function portaVeneziana(xParede, lado, zCentro, yBase) {
+  const { largura: W, altura: A, batente: B } = PORTA, g = new THREE.Group();
+  const caixa = (w, h, d, x, y, z, m, rx = 0) => {
+    const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.x = rx; g.add(o); return o;
+  };
+  const claro = mat(0xe9e8e4), grafite = mat(0x34373b, { roughness: 0.5, metalness: 0.45 });
+  const ripa = mat(0x676b71, { roughness: 0.45, metalness: 0.5 }), inox = mat(0xb9bdc3, { roughness: 0.35, metalness: 0.6 });
+  caixa(B, A, 0.07, -(W + B) / 2, A / 2, 0.035, claro); caixa(B, A, 0.07, (W + B) / 2, A / 2, 0.035, claro);   // batente
+  caixa(W + 2 * B, B, 0.07, 0, A + B / 2, 0.035, claro);
+  caixa(W, A, 0.03, 0, A / 2, 0.02, grafite);                                                                 // folha
+  const passo = 0.062, n = Math.floor((A - 0.16) / passo);
+  for (let i = 0; i < n; i++) caixa(W - 0.1, 0.034, 0.03, 0, 0.1 + i * passo + 0.02, 0.05, ripa, -0.6);        // venezianas
+  caixa(0.04, 0.2, 0.012, -W / 2 + 0.08, 1.0, 0.045, inox);                                                   // espelho da fechadura
+  caixa(0.11, 0.025, 0.03, -W / 2 + 0.13, 1.0, 0.075, inox);                                                  // maçaneta
+  g.position.set(xParede - lado * 0.005, yBase, zCentro);
+  g.rotation.y = lado > 0 ? -Math.PI / 2 : Math.PI / 2;                                                       // frente para dentro do galpão
+  return g;
+}
 const matFantasma = new THREE.MeshBasicMaterial({ color: 0xa89f90, transparent: true, opacity: 0.28, side: THREE.BackSide, depthWrite: false });
 function montarParedes(x0, x1, z0, z1) {
   paredes.clear();
-  const H = PAREDES.altura, frente = PAREDES.frente[state.parte];
+  const H = PAREDES.altura[state.parte] || 5.0, frente = PAREDES.frente[state.parte];
   // [x de, x até, z de, z até, giro Y, fantasma]: a normal do plano (+Z) é girada para apontar ao centro do galpão
   const lados = [
     [x0, x1, z0, z0, 0],                                         // fundo (Z−)
@@ -623,6 +643,8 @@ function montarParedes(x0, x1, z0, z1) {
       paredes.add(m);
     }
   }
+  const E = D.escada;
+  if (E && E.parte === state.parte) paredes.add(portaVeneziana(E.lado > 0 ? x1 : x0, E.lado, E.z1 - E.sentido * E.patamar / 2, E.altura));
   paredes.visible = true;
 }
 // Rampa do Galpão 2: na frente aberta, pequeno declive que desce até o corredor de carregamento (metros, mesma planta dos racks).
@@ -669,7 +691,11 @@ function ajustarLaje() {
   // aberta e a laje e as pontas terminam na linha da mesa.
   const naMesa = D.mesa && state.parte === D.mesa.parte;
   const margem = PAREDES.margem;
-  const x0 = e.minX - margem, x1 = e.maxX + margem, z0 = e.minZ - margem, z1 = naMesa ? D.mesa.z1 : e.maxZ + margem;
+  let x0 = e.minX - margem, x1 = e.maxX + margem;
+  const z0 = e.minZ - margem, z1 = naMesa ? D.mesa.z1 : e.maxZ + margem;
+  if (D.escada && D.escada.parte === state.parte) {      // a parede do lado da escada encosta nela
+    if (D.escada.lado > 0) x1 = D.escada.x1 + 0.01; else x0 = D.escada.x0 - 0.01;
+  }
   montarParedes(x0, x1, z0, z1);
   montarLaje(x0, x1, z0, z1);
   const R = Math.hypot(e.maxX - e.minX, e.maxZ - e.minZ) / 2 + 4;
@@ -700,7 +726,7 @@ function projetar(alvo, dist, cantos) {
 function enquadrar(filtro, animar = true) {
   const e = envelope(filtro);
   const cantos = [];
-  for (const x of [e.minX, e.maxX]) for (const z of [e.minZ, e.maxZ]) for (const y of [0, 5.4]) cantos.push(new THREE.Vector3(x, y, z));
+  for (const x of [e.minX, e.maxX]) for (const z of [e.minZ, e.maxZ]) for (const y of [0, Math.max(5.4, PAREDES.altura[state.parte] || 0)]) cantos.push(new THREE.Vector3(x, y, z));
   const alvo = new THREE.Vector3((e.minX + e.maxX) / 2, 0.8, (e.minZ + e.maxZ) / 2);
   const frente = new THREE.Vector3(-DIR.x, 0, -DIR.z).normalize();    // "para cima" da tela, no chão
   const sinEl = DIR.y, tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
