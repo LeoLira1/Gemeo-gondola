@@ -11,26 +11,26 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 
 /* barra de cima */
-#top { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+#top { position: absolute; left: 8px; top: 8px; right: 8px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
 #top > *, #top .row > * { pointer-events: auto; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.seg, .chips { display: inline-flex; flex-wrap: wrap; padding: 4px; gap: 4px; }
-.seg button, .chip { border: 0; background: transparent; padding: 8px 14px; border-radius: 10px; cursor: pointer; position: relative;
-  font: inherit; font-weight: 600; color: #6a665d; min-height: 36px; transition: background .15s, color .15s; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.seg, .chips { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 3px; }
+.seg button, .chip { border: 0; background: transparent; padding: 5px 12px; border-radius: 10px; cursor: pointer; position: relative;
+  font: inherit; font-weight: 600; color: #6a665d; min-height: 30px; transition: background .15s, color .15s; }
 .seg button small { font-weight: 500; opacity: .75; margin-left: 5px; }
 .seg button:hover, .chip:hover { background: rgba(0,0,0,.05); }
 .seg button.on { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(232,119,34,.35); }
 .chip.on { background: var(--ink); color: #fff; }
-.chip { padding: 6px 12px; min-height: 32px; }
+.chip { padding: 4px 10px; min-height: 28px; }
 .dot { position: absolute; top: 3px; right: 3px; width: 9px; height: 9px; border-radius: 50%; background: var(--hit);
   box-shadow: 0 0 0 2px #fff; display: none; }
 .has > .dot { display: block; }
-.field { display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 44px; transition: box-shadow .15s, border-color .15s; }
+.field { display: inline-flex; align-items: center; gap: 8px; padding: 0 10px; min-height: 36px; transition: box-shadow .15s, border-color .15s; }
 .field label { color: var(--muted); font-weight: 700; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
-.field input { border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--ink); width: 170px; padding: 8px 0; }
+.field input { border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; color: var(--ink); width: 170px; padding: 5px 0; }
 .field input.num { width: 84px; }
 .field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,119,34,.22), var(--sombra); }
-.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 0 14px; min-height: 44px; cursor: pointer;
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 14px; padding: 0 12px; min-height: 36px; cursor: pointer;
   font: inherit; font-weight: 600; color: #5d5a53; box-shadow: var(--sombra); backdrop-filter: blur(8px); transition: background .15s, color .15s; }
 .btn:hover { background: #fff; }
 .btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -52,7 +52,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 #stats b { color: var(--ink); }
 
 /* cartão e dica */
-#info { position: absolute; right: 12px; top: 112px; width: 300px; max-width: calc(100% - 24px); max-height: calc(100% - 200px);
+#info { position: absolute; right: 12px; top: 56px; width: 300px; max-width: calc(100% - 24px); max-height: calc(100% - 130px);
   overflow: auto; padding: 12px 14px; display: none; }
 #info h4 { margin: 0 0 2px; font-size: 14px; padding-right: 22px; }
 #info .sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
@@ -82,7 +82,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 }
 
 /* Produtos estocados (violeta = fora do saldo) */
-#estoc { position: absolute; left: 12px; top: 112px; width: 340px; max-width: calc(100% - 24px); max-height: calc(100% - 200px);
+#estoc { position: absolute; left: 12px; top: 56px; width: 340px; max-width: calc(100% - 24px); max-height: calc(100% - 130px);
   overflow: auto; padding: 12px 14px; z-index: 4; }
 #estoc h4 { margin: 0 0 2px; font-size: 14px; padding-right: 22px; }
 #estoc .sub { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
@@ -93,5 +93,13 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 #estoc .it { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
 #estoc .onde { color: #6d3fd1; font-size: 12px; font-weight: 600; }
 #estoc .onde.sem { color: var(--muted); font-weight: 500; }
+
+/* Busca por produto em destaque (laranja): é o campo mais usado, tem que saltar aos olhos */
+.field:has(#qProd) { background: linear-gradient(135deg, #f08a3c, #e87722); border-color: #d1650f;
+  box-shadow: 0 6px 18px rgba(232,119,34,.45); }
+.field:has(#qProd) label { color: #fff; opacity: .95; }
+.field:has(#qProd) input { color: #fff; font-weight: 600; }
+.field:has(#qProd) input::placeholder { color: rgba(255,255,255,.85); font-weight: 500; }
+.field:has(#qProd):focus-within { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.7), 0 6px 18px rgba(232,119,34,.55); }
 
 #bGirar { position: absolute; right: 12px; top: 12px; z-index: 5; min-height: 32px; width: 32px; padding: 0; border-radius: 10px; font-size: 16px; line-height: 1; }
