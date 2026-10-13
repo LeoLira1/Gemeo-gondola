@@ -140,19 +140,25 @@ def montar(
     grupos = g.grupos_de_codigos(codigos_com_rack, vinculos, nome_mestre)
     saldos = g.montar_saldos(codigos_com_rack, grupos, sistema, enderecado)
 
-    # Nome: o do estoque_mestre quando existe, senão o gravado no rack.
+    # Nome: o do estoque_mestre quando existe, senão o gravado no rack. Estocado (EST:) NUNCA é renomeado:
+    # dois cooperados com o mesmo produto têm o mesmo código, e o nome é o que liga o palete ao item.
     catalogo: dict[str, str] = {}
+    catalogo_est: set[tuple[str, str]] = set()
     for pilha in pilhas.values():
         for r in pilha:
             if not r["c"].strip():
                 continue
-            nome = r["nome"] if r["e"] else (nome_mestre.get(g.normalizar_codigo(r["c"]) or "") or r["nome"])
+            if r["e"]:
+                catalogo_est.add((r["c"], r["nome"]))
+                continue
+            nome = nome_mestre.get(g.normalizar_codigo(r["c"]) or "") or r["nome"]
             catalogo.setdefault(r["c"], nome)
             if not r["nome"]:
                 r["nome"] = nome
     for pilha in pilhas.values():
         for r in pilha:
-            r["nome"] = catalogo.get(r["c"], r["nome"])
+            if not r["e"]:
+                r["nome"] = catalogo.get(r["c"], r["nome"])
 
     divergencia = {
         cod: {
@@ -191,7 +197,7 @@ def montar(
         },
         "pilhas": {str(n): sorted(p, key=lambda r: r["o"]) for n, p in pilhas.items()},
         "divergencia": divergencia,
-        "catalogo": [{"c": c, "n": n} for c, n in sorted(catalogo.items())],
+        "catalogo": es.catalogo_da_cena(catalogo, catalogo_est),
         "escada": g.escada(),
         "lavaolhos": g.lava_olhos(),
     }

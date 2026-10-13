@@ -16,7 +16,7 @@ import streamlit.components.v1 as components
 
 import dados as dd
 
-ALTURA_MAPA = 780
+ALTURA_MAPA = 720
 UI_CSS = Path(__file__).with_name("ui.css")
 UI_JS = Path(__file__).with_name("ui.js")
 CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html"),
@@ -26,7 +26,7 @@ st.set_page_config(page_title="CAMDA · Mapas 3D", page_icon="📦", layout="wid
 st.markdown(
     """
 <style>
-.block-container { padding: 2.4rem 1.4rem 1.2rem; max-width: 1500px; }
+.block-container { padding: 2.2rem 1.4rem .6rem; max-width: 1500px; }
 footer, [data-testid="stDecoration"] { display: none; }
 header[data-testid="stHeader"] { background: transparent; }
 .brand { display: flex; align-items: center; gap: .75rem; }
@@ -34,7 +34,7 @@ header[data-testid="stHeader"] { background: transparent; }
   color: #fff; display: grid; place-items: center; font-size: 1.25rem; box-shadow: 0 6px 16px rgba(232,119,34,.35); }
 .brand h1 { font-size: 1.35rem; line-height: 1.15; margin: 0; padding: 0; font-weight: 700; letter-spacing: -.01em; }
 .brand small { color: #8a877f; font-size: .78rem; }
-.stats { display: flex; flex-wrap: wrap; gap: .5rem; margin: .9rem 0 .8rem; }
+.stats { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0 .5rem; }
 .stat { background: #fff; border: 1px solid #e3dfd5; border-radius: 999px; padding: .3rem .8rem; font-size: .84rem; color: #5d5a53;
   box-shadow: 0 1px 2px rgba(60,50,30,.04); white-space: nowrap; }
 .stat b { color: #2b2a27; font-weight: 700; }
@@ -137,8 +137,7 @@ def _stat(rotulo: str, valor: object, cor: str | None = None) -> str:
 if mapa == "galpao":
     pilhas = dados["pilhas"]
     total = len(dados["posicoes"])
-    chips = [_stat(f"de {total} posições com carga", len(pilhas)),
-             _stat(f"· de {total * dados['geo']['niveisMax']} vagas", dd.resumo_galpao(dados), "#8B5CF6")]
+    chips = [_stat(f"de {total} posições com carga", len(pilhas))]
 elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]

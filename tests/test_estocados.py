@@ -119,3 +119,49 @@ def test_ler_tudo_sem_materiais_terceiros_nao_derruba(monkeypatch):
 def test_exemplo_nao_cria_divergencia_para_estocado():
     t = dd.tudo_exemplo()
     assert not any(k.startswith("EST:") for k in t["galpao"]["divergencia"])
+
+
+def test_mesmo_codigo_em_dois_cooperados_nao_troca_o_nome():
+    # EST:42200 é o mesmo código para dois cooperados: o nome do palete é o que liga ao item
+    racks = [
+        {"posicao": 45, "ordem": 2, "produto_codigo": "EST:42200", "produto_nome": "ROUNDUP 20L · ANA", "quantidade": 10},
+        {"posicao": 46, "ordem": 1, "produto_codigo": "EST:42200", "produto_nome": "ROUNDUP 20L · MARCELO", "quantidade": 45},
+    ]
+    out = dd.montar(racks, [], {}, [])
+    assert out["pilhas"]["45"][0]["nome"] == "ROUNDUP 20L · ANA"
+    assert out["pilhas"]["46"][0]["nome"] == "ROUNDUP 20L · MARCELO"
+    assert [c["n"] for c in out["catalogo"] if c.get("e")] == ["ROUNDUP 20L · ANA", "ROUNDUP 20L · MARCELO"]
+    linhas = [
+        {"razao_social": "MARCELO", "descricao": "ROUNDUP 20L", "codigo": "42200", "saldo": "99"},
+        {"razao_social": "ANA", "descricao": "ROUNDUP 20L", "codigo": "42200", "saldo": "10"},
+    ]
+    itens = {i["coop"]: i["end"] for i in dd.estocados_da_cena(linhas, out, br.montar(None))["itens"]}
+    assert itens == {"MARCELO": ["Galpão 46 · N1"], "ANA": ["Galpão 45 · N2"]}
+
+
+def test_catalogo_do_barracao_tem_um_estocado_por_cooperado():
+    out = br.montar([
+        {"id": 1, "rotulo": "BAR-01", "pos_x": 100, "pos_z": 100, "produto_codigo": "EST:9", "produto_nome": "A · ANA", "quantidade": 1},
+        {"id": 2, "rotulo": "BAR-02", "pos_x": 300, "pos_z": 100, "produto_codigo": "EST:9", "produto_nome": "A · BIA", "quantidade": 1},
+        {"id": 3, "rotulo": "BAR-03", "pos_x": 500, "pos_z": 100, "produto_codigo": "123", "produto_nome": "C", "quantidade": 1},
+    ])
+    assert out["catalogo"] == [{"c": "123", "n": "C"}, {"c": "EST:9", "n": "A · ANA", "e": True}, {"c": "EST:9", "n": "A · BIA", "e": True}]
+
+
+def test_mesmo_produto_do_mesmo_cooperado_soma_o_saldo():
+    linhas = [
+        {"razao_social": "BRAVO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "40"},
+        {"razao_social": "BRAVO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "22"},
+        {"razao_social": "BRAVO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "107"},
+        {"razao_social": "OUTRO", "descricao": "BORAL 20L", "codigo": "254185", "saldo": "5"},
+        {"razao_social": "BRAVO", "descricao": "VANTACOR 5L", "codigo": "9", "saldo": "12"},
+        {"razao_social": "BRAVO", "descricao": "VANTACOR 5L", "codigo": "9", "saldo": "0"},  # saldo 0 não conta
+    ]
+    racks = [(7, {"o": 1, "c": "EST:254185", "nome": "BORAL 20L · BRAVO"})]
+    itens = es.para_cena(linhas, racks, [])["itens"]
+    por = {(i["coop"], i["prod"]): i for i in itens}
+    assert len(itens) == 3
+    b = por[("BRAVO", "BORAL 20L")]
+    assert (b["saldo"], b["n"], b["end"]) == (169, 3, ["Galpão 7 · N1"])  # 40 + 22 + 107, um endereço só
+    assert por[("OUTRO", "BORAL 20L")]["saldo"] == 5 and por[("OUTRO", "BORAL 20L")]["end"] == []
+    assert por[("BRAVO", "VANTACOR 5L")]["n"] == 1

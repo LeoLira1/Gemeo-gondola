@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from estocados import codigo_eh_estocado
+from estocados import catalogo_da_cena, codigo_eh_estocado
 
 # ── Obra (centímetros) ──────────────────────────────────────────────────────
 LARGURA = 3500.0          # X: a parede das aberturas tem esta medida
@@ -115,8 +115,13 @@ def montar(linhas: list[dict[str, Any]] | None) -> dict[str, Any]:
         p["f"] = fileira_de[round(p["z"] * 10)]
 
     catalogo: dict[str, str] = {}
+    catalogo_est: set[tuple[str, str]] = set()
     for p in pal:
-        if p["c"].strip():
+        if not p["c"].strip():
+            continue
+        if p["e"]:  # estocado: um item por cooperado (o código se repete entre cooperados)
+            catalogo_est.add((p["c"], p["n"]))
+        else:
             catalogo.setdefault(p["c"], p["n"])
     return {
         "padrao": padrao,
@@ -127,7 +132,7 @@ def montar(linhas: list[dict[str, Any]] | None) -> dict[str, Any]:
         "corredor": CORREDOR_MANOBRA / 100,
         "fileiras": len(zs),
         "pal": pal,
-        "catalogo": [{"c": c, "n": n} for c, n in sorted(catalogo.items())],
+        "catalogo": catalogo_da_cena(catalogo, catalogo_est),
         "avisos": (["barracao_enderecos está vazia ou não pôde ser lida; o barracão mostra o layout padrão, com todos os paletes livres."]
                    if padrao else []),
     }

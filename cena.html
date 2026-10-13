@@ -13,9 +13,9 @@
       <div class="panel seg" id="partes"></div>
       <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129, escada, chuveiro" autocomplete="off"></div>
       <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
+      <div class="panel chips" id="chips"></div>
       <span id="msg"></span>
     </div>
-    <div class="row"><div class="panel chips" id="chips"></div></div>
   </div>
   <div id="info" class="panel"></div>
   <div id="legend" class="panel">
@@ -50,6 +50,8 @@ const posPorN = new Map(D.posicoes.map((p) => [p.n, p]));
 const pilhaDe = (n) => D.pilhas[String(n)] || [];
 const ruasDaParte = (p) => D.ruas.filter((r) => r.p === p);
 const normCod = (c) => (c || "").trim().toUpperCase();
+// Chave de casamento da busca: o estocado liga pelo NOME (o código EST: se repete entre cooperados)
+const chave = (c, nome, e) => (e ? "EST|" + nome : normCod(c));
 
 // ── Three.js ────────────────────────────────────────────────────────────────
 const canvas = $("gl");
@@ -123,6 +125,158 @@ const cimentoTex = (() => {
 const laje = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), M.laje);
 laje.receiveShadow = true;
 scene.add(laje);
+
+// ── Paleteira manual (transpalete hidráulica) — peça estática de cenário, em metros ─────────────
+// Origem no chão, no centro; garfos apontam para +X e a alça fica do lado -X. Não entra na busca nem no toque.
+function criarPaleteira(opcoes = {}) {
+  const { corChassi = 0xf2c200, capacidade = "2500 kg", comprimentoGarfo = 1.15, larguraTotal = 0.54, sombras = true } = opcoes;
+  const mt = {
+    amarelo: new THREE.MeshStandardMaterial({ color: corChassi, roughness: 0.6, metalness: 0 }),
+    preto: new THREE.MeshStandardMaterial({ color: 0x24242a, roughness: 0.7, metalness: 0 }),
+    vermelho: new THREE.MeshStandardMaterial({ color: 0x8f1d1d, roughness: 0.8, metalness: 0 }),
+    nylon: new THREE.MeshStandardMaterial({ color: 0xece9e0, roughness: 0.7, metalness: 0 }),
+    cromo: new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.55, metalness: 0.2 }),   // sem mapa de ambiente: metal puro ficaria preto
+  };
+  const ALT_BAIXA = 0.085, ESP_GARFO = 0.05, LARG_GARFO = 0.16, PIVO_X = -0.17;
+  const zGarfo = larguraTotal / 2 - LARG_GARFO / 2;
+
+  const raiz = new THREE.Group();
+  raiz.name = "Paleteira";
+  const base = new THREE.Group();
+  base.position.x = -(comprimentoGarfo + (PIVO_X - 0.09)) / 2;     // centraliza
+  raiz.add(base);
+
+  const malha = (geo, m, pai) => {
+    const o = new THREE.Mesh(geo, m);
+    o.castShadow = sombras; o.receiveShadow = sombras;
+    pai.add(o);
+    return o;
+  };
+
+  // tronco de pirâmide (base retangular → topo retangular)
+  function geoTronco(bx0, bx1, bz, tx0, tx1, tz, y0, y1) {
+    const g = new THREE.BoxGeometry(1, 1, 1);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const topo = p.getY(i) > 0, mx = p.getX(i) > 0, sz = p.getZ(i) > 0 ? 1 : -1;
+      p.setXYZ(i, topo ? (mx ? tx1 : tx0) : (mx ? bx1 : bx0), topo ? y1 : y0, sz * (topo ? tz : bz));
+    }
+    g.computeVertexNormals();
+    return g;
+  }
+
+  // garfo com ponta arredondada e rasgo da roleta
+  function geoGarfo() {
+    const L = comprimentoGarfo, w = LARG_GARFO, r = w / 2;
+    const s = new THREE.Shape();
+    s.moveTo(0, -w / 2); s.lineTo(L - r, -w / 2);
+    s.absarc(L - r, 0, r, -Math.PI / 2, Math.PI / 2, false);
+    s.lineTo(0, w / 2); s.lineTo(0, -w / 2);
+    const fx0 = L - 0.34, fx1 = L - 0.16, fr = 0.035;
+    const furo = new THREE.Path();
+    furo.moveTo(fx0, -fr); furo.lineTo(fx1, -fr);
+    furo.absarc(fx1, 0, fr, -Math.PI / 2, Math.PI / 2, false);
+    furo.lineTo(fx0, fr);
+    furo.absarc(fx0, 0, fr, Math.PI / 2, (3 * Math.PI) / 2, false);
+    s.holes.push(furo);
+    const g = new THREE.ExtrudeGeometry(s, { depth: ESP_GARFO - 0.006, bevelEnabled: true, bevelThickness: 0.003, bevelSize: 0.003, bevelSegments: 2, curveSegments: 12 });
+    g.rotateX(-Math.PI / 2);                                       // extrusão vira altura (+Y)
+    return g;
+  }
+  const geoRoda = (raio, largura) => new THREE.CylinderGeometry(raio, raio, largura, 24).rotateX(Math.PI / 2);   // eixo em Z
+
+  // corpo (garfos, travessa, torre, adesivo)
+  const corpo = new THREE.Group();
+  corpo.name = "Corpo";
+  base.add(corpo);
+  const gGarfo = geoGarfo();
+  for (const z of [-zGarfo, zGarfo]) malha(gGarfo, mt.amarelo, corpo).position.set(0, ALT_BAIXA - ESP_GARFO + 0.003, z);
+  malha(new THREE.BoxGeometry(0.14, 0.115, larguraTotal), mt.amarelo, corpo).position.set(0.05, 0.0925, 0);
+  malha(geoTronco(-0.03, 0.16, 0.25, -0.11, 0.0, 0.07, 0.13, 0.40), mt.amarelo, corpo);
+  {
+    const cv = document.createElement("canvas");
+    cv.width = 256; cv.height = 112;
+    const c = cv.getContext("2d");
+    c.fillStyle = "#ffffff"; c.fillRect(0, 0, 256, 112);
+    c.strokeStyle = "#111"; c.lineWidth = 8; c.strokeRect(4, 4, 248, 104);
+    c.fillStyle = "#c62828"; c.font = "bold 54px Arial, sans-serif";
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillText(capacidade.toUpperCase(), 128, 58);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.anisotropy = 4;
+    const adesivo = new THREE.Mesh(new THREE.PlaneGeometry(0.13, 0.057), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0 }));
+    const n = new THREE.Vector3(0.27, 0.16, 0).normalize();
+    adesivo.position.set(0.08, 0.265, 0).addScaledVector(n, 0.002);
+    adesivo.lookAt(adesivo.position.clone().add(n));
+    corpo.add(adesivo);
+  }
+
+  // roletas de carga (no chão)
+  const gRoleta = geoRoda(0.037, 0.06);
+  const gEixoRoleta = new THREE.CylinderGeometry(0.008, 0.008, 0.075, 12).rotateX(Math.PI / 2);
+  for (const z of [-zGarfo, zGarfo]) {
+    for (const dx of [0.29, 0.21]) {
+      const x = comprimentoGarfo - dx;
+      malha(gRoleta, mt.nylon, base).position.set(x, 0.037, z);
+      malha(gEixoRoleta, mt.cromo, base).position.set(x, 0.037, z);
+    }
+  }
+
+  // direção: rodas + bomba + alça
+  const direcao = new THREE.Group();
+  direcao.name = "Direcao";
+  direcao.position.set(PIVO_X, 0, 0);
+  base.add(direcao);
+  const gRoda = geoRoda(0.09, 0.05), gCubo = geoRoda(0.052, 0.054);
+  for (const z of [-0.035, 0.035]) {
+    malha(gRoda, mt.vermelho, direcao).position.set(0, 0.09, z);
+    malha(gCubo, mt.preto, direcao).position.set(0, 0.09, z);
+  }
+  malha(new THREE.CylinderGeometry(0.012, 0.012, 0.17, 12).rotateX(Math.PI / 2), mt.cromo, direcao).position.set(0, 0.09, 0);
+  const gPlaca = new THREE.BoxGeometry(0.12, 0.15, 0.012);
+  for (const z of [-0.075, 0.075]) malha(gPlaca, mt.preto, direcao).position.set(0, 0.12, z);
+  malha(new THREE.CylinderGeometry(0.09, 0.09, 0.02, 24), mt.preto, direcao).position.set(0, 0.2, 0);
+
+  // bomba hidráulica + mola
+  malha(new THREE.CylinderGeometry(0.05, 0.055, 0.19, 20), mt.preto, direcao).position.set(0, 0.305, 0);
+  class Helice extends THREE.Curve {
+    getPoint(t, alvo = new THREE.Vector3()) {
+      const a = t * Math.PI * 2 * 6;
+      return alvo.set(Math.cos(a) * 0.068, 0.215 + t * 0.12, Math.sin(a) * 0.068);
+    }
+  }
+  malha(new THREE.TubeGeometry(new Helice(), 120, 0.0055, 5, false), mt.cromo, direcao);
+  malha(new THREE.CylinderGeometry(0.02, 0.02, 0.04, 12), mt.cromo, direcao).position.set(0, 0.42, 0);
+  malha(new THREE.CylinderGeometry(0.009, 0.009, 0.13, 8).rotateX(Math.PI / 2), mt.cromo, direcao).position.set(0, 0.43, 0);
+
+  // alça
+  const alca = new THREE.Group();
+  alca.name = "Alca";
+  alca.position.set(0, 0.43, 0);
+  direcao.add(alca);
+  for (const z of [-0.045, 0.045]) malha(new THREE.BoxGeometry(0.05, 0.08, 0.012), mt.preto, alca).position.set(0, 0.02, z);
+  malha(new THREE.CylinderGeometry(0.024, 0.024, 0.3, 12), mt.preto, alca).position.set(0, 0.17, 0);
+  malha(new THREE.CylinderGeometry(0.017, 0.017, 0.8, 12), mt.preto, alca).position.set(0, 0.4, 0);
+  const laco = new THREE.CatmullRomCurve3(
+    [[0, 0.48, 0], [0, 0.53, 0.06], [0, 0.63, 0.16], [0, 0.72, 0.19], [0, 0.78, 0.13], [0, 0.80, 0],
+     [0, 0.78, -0.13], [0, 0.72, -0.19], [0, 0.63, -0.16], [0, 0.53, -0.06]].map(([x, y, z]) => new THREE.Vector3(x, y, z)),
+    true, "centripetal");
+  malha(new THREE.TubeGeometry(laco, 60, 0.017, 8, true), mt.preto, alca);
+  const gatilho = malha(new THREE.BoxGeometry(0.014, 0.022, 0.11), mt.preto, alca);
+  gatilho.position.set(0, 0.70, 0.05);
+  gatilho.rotation.x = -0.35;
+  alca.rotation.z = 0.12;                                          // alça levemente inclinada para trás
+
+  raiz.userData.dimensoes = { comprimento: comprimentoGarfo + 0.26, largura: larguraTotal, alturaAlca: 1.23 };
+  return raiz;
+}
+// Onde ela fica no galpão (metros, mesma planta dos racks): parte 1, na frente da R8, no vão entre a R8 e a R1.
+// Ajuste x/z para mover; ang gira no mapa (π/2 = garfos apontando para o fundo do galpão, alça para quem olha).
+const PALETEIRA = { parte: 1, x: 4.6, z: 11.7, ang: Math.PI / 2 };
+const paleteira = criarPaleteira({ capacidade: "2500 kg" });
+paleteira.position.set(PALETEIRA.x, 0, PALETEIRA.z);
+paleteira.rotation.y = PALETEIRA.ang;
+scene.add(paleteira);
 
 // Rótulos (sprites com número)
 const texCache = {};
@@ -300,7 +454,7 @@ scene.add(hoverBox);
 
 // ── Cores ───────────────────────────────────────────────────────────────────
 function materialDo(r) {
-  if (state.matched.size && state.matched.has(normCod(r.c))) return M.verde;     // busca > saldo
+  if (state.matched.size && state.matched.has(chave(r.c, r.nome, r.e))) return M.verde;     // busca > saldo
   if (r.e) return M.violeta;                                                          // estocado: fora do saldo
   const d = D.divergencia[r.c];
   if (d) return d.t === "falta" ? M.vermelho : M.azul;
@@ -334,6 +488,7 @@ function atualizarVisibilidade() {
       if (c.vazia) alvos.push(c.tile); else alvos.push(...c.racks);
     }
   }
+  paleteira.visible = state.parte === PALETEIRA.parte;       // cenário: acompanha a parte, não o filtro de rua
   for (const [n, s] of rotulosRua) {
     const r = D.ruas.find((x) => x.n === n);
     s.visible = r.p === state.parte;
@@ -389,7 +544,7 @@ function voarPara(alvo, pos, dur = 650) {
   tween = { t0: performance.now(), dur, p0: camera.position.clone(), t_0: controls.target.clone(), p1: pos, t1: alvo };
 }
 const _cam = new THREE.PerspectiveCamera();
-const FAIXA = { xMax: 0.95, yMax: 0.72, yMin: -0.82 };   // folga p/ a barra de cima e a legenda
+const FAIXA = { xMax: 0.95, yMax: 0.9, yMin: -0.86 };   // folga p/ a barra de cima (compacta, 1 linha) e a legenda
 // Caixa (área × altura da pilha) projetada na câmera para uma distância: {x, yMin, yMax} em NDC.
 function projetar(alvo, dist, cantos) {
   _cam.fov = camera.fov; _cam.aspect = camera.aspect; _cam.near = 0.1; _cam.far = 1000;
@@ -462,7 +617,7 @@ function montarChips() {
 function acertos() {
   const pos = [];
   if (state.matched.size) {
-    for (const c of casas.values()) if (c.racks.some((m) => state.matched.has(normCod(m.userData.rack.c)))) pos.push(c.p);
+    for (const c of casas.values()) if (c.racks.some((m) => state.matched.has(chave(m.userData.rack.c, m.userData.rack.nome, m.userData.rack.e)))) pos.push(c.p);
   }
   return pos;
 }
@@ -565,7 +720,7 @@ $("qNum").addEventListener("keydown", (e) => {
 });
 
 // ── Busca por produto ───────────────────────────────────────────────────────
-const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, k: fold(p.n) + " " + fold(p.c) }));
+const catalogo = D.catalogo.map((p) => ({ c: p.c, n: p.n, e: p.e, k: fold(p.n) + " " + fold(p.c) }));
 function buscarProduto(q) {
   const limpa = fold(q).trim();
   if (limpa.length < 2) return [];
@@ -580,7 +735,7 @@ $("qProd").addEventListener("input", () => {
 function aplicarBuscaProduto() {
   const q = $("qProd").value;
   const achados = buscarProduto(q);
-  state.matched = new Set(achados.map((p) => normCod(p.c)));
+  state.matched = new Set(achados.map((p) => chave(p.c, p.n, p.e)));
   const msg = $("msg");
   if (!state.matched.size) {
     msg.innerHTML = q.trim().length >= 2 ? "nenhum produto no galpão" : "";

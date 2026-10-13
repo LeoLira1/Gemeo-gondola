@@ -45,8 +45,11 @@ então **não entra na conta de estoque da loja** (saldo, baixa pela contagem, M
   (`dados.montar`). Sem coluna nova no banco. A regra pura está em `estocados.py` (`deve_espelhar`).
 - **Botão "Produtos estocados"** no galpão e no barracão: busca por cooperado, produto ou código (sem acento, vários
   termos), lista agrupada por cooperado com saldo e o endereço (`📍 Galpão 40 · N4`, `BAR-07` ou `sem endereço`).
+- **Campo Produto:** também procura nos estocados (cooperado, produto ou código), inclusive itens sem endereço, e mostra
+  `Estocados N itens (M sem endereço) →`; o link abre a lista já filtrada.
+- **Agrupamento:** linhas do mesmo produto do mesmo cooperado (lotes, notas) viram um item só, com o saldo somado
+  (`3 lançamentos`).
 - **Mapa:** paletes de estocado em violeta (`#8B5CF6`).
-- **Chip do galpão:** `38 livres · 30 estocados · 61 loja` (parte zerada some); vagas = posições × níveis (129 × 4 = 516).
 - **Somente leitura:** lançar, ajustar e "Retirar do endereço" continuam no app Flutter Gôndolas; este app não escreve
   no banco. Quem um dia escrever aqui deve checar `deve_espelhar(codigo)` antes de gravar em `estoque_localizado`.
 - Se `materiais_terceiros` não puder ser lida, a lista fica vazia e o app avisa; o resto segue.

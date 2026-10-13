@@ -26,6 +26,23 @@
   linha.insertBefore(n, $$("msg") || null);
 })();
 
+// Botão pequeno no canto superior direito: deixa a maquete girando devagar (só estético, p/ quando não está em uso).
+(function () {
+  const w = document.getElementById("wrap");
+  if (!w || typeof controls === "undefined") return;
+  const g = document.createElement("button");
+  g.id = "bGirar"; g.className = "btn"; g.textContent = "⟳"; g.title = "Girar a maquete lentamente";
+  const ligar = (on) => {
+    controls.autoRotate = on; controls.autoRotateSpeed = 1.2; g.classList.toggle("on", on); dirty = true;
+    try { sessionStorage.setItem("camda_girar", on ? "1" : "0"); } catch (e) {}
+  };
+  g.onclick = () => ligar(!controls.autoRotate);
+  let ini = false;
+  try { ini = sessionStorage.getItem("camda_girar") === "1"; } catch (e) {}
+  ligar(ini);
+  w.appendChild(g);
+})();
+
 // ── Busca global: o produto é procurado no galpão, na loja e no barracão ─────
 // O Python injeta em D.global uma linha por produto em cada local ({c, n, a: mapa, w: local}) e
 // D.area (o mapa desta cena). Cada cena acende só o que é dela; aqui sai o resumo dos três mapas,
@@ -109,7 +126,7 @@
       h += `<div class="coop">${esc(coop || "(sem cooperado)")}</div>`;
       for (const i of lista) {
         const onde = i.end.length ? "📍 " + i.end.map(esc).join(" · ") : "sem endereço";
-        h += `<div class="it"><div>${esc(i.prod)}<br><span class="onde${i.end.length ? "" : " sem"}">${onde}</span></div><b>${fmtN.format(i.saldo)}</b></div>`;
+        h += `<div class="it"><div>${esc(i.prod)}${i.n > 1 ? ` <span class="onde sem">· ${i.n} lançamentos</span>` : ""}<br><span class="onde${i.end.length ? "" : " sem"}">${onde}</span></div><b>${fmtN.format(i.saldo)}</b></div>`;
       }
     }
     $("estLista").innerHTML = h || `<div class="sub">${D.estocados.ok ? "Nenhum item encontrado." : "materiais_terceiros indisponível."}</div>`;
@@ -121,4 +138,33 @@
   painel.querySelector(".x").onclick = () => b.click();
   $("qEst").addEventListener("input", desenhar);
   (linha || $("top")).insertBefore(b, msg || null);
+
+  // O campo Produto também procura nos estocados (cooperado, produto ou código), inclusive os sem endereço,
+  // que nenhuma busca por palete enxerga. Acrescenta ao resumo da busca e abre o painel já filtrado.
+  const campo = $("qProd");
+  if (!campo || !msg) return;
+  let t = null;
+  campo.addEventListener("input", () => {
+    clearTimeout(t);
+    t = setTimeout(() => {                                   // depois do resumo da cena e do resumo global
+      const termos = dobra(campo.value).trim().split(/\s+/).filter(Boolean);
+      if (dobra(campo.value).trim().length < 2) return;
+      const achados = itens.filter((i) => termos.every((x) => i.k.includes(x)));
+      if (!achados.length) return;
+      const sem = achados.filter((i) => !i.end.length).length;
+      const coops = new Set(achados.map((i) => i.coop)).size;
+      msg.insertAdjacentHTML("beforeend",
+        ` · <a href="#" data-est="1" style="color:${D.estocados.cor}" title="Abrir a lista de estocados com esta busca">` +
+        `Estocados ${achados.length} iten${achados.length === 1 ? "" : "s"}` +
+        `${coops > 1 ? " de " + coops + " cooperados" : ""}${sem ? " (" + sem + " sem endereço)" : ""} →</a>`);
+    }, 420);
+  });
+  msg.addEventListener("click", (ev) => {
+    const a = ev.target.closest("a[data-est]");
+    if (!a) return;
+    ev.preventDefault();
+    $("qEst").value = campo.value;
+    if (painel.style.display === "none") b.click(); else desenhar();
+  });
+  if (campo.value) campo.dispatchEvent(new Event("input"));
 })();
