@@ -93,3 +93,11 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 #estoc .it { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
 #estoc .onde { color: #6d3fd1; font-size: 12px; font-weight: 600; }
 #estoc .onde.sem { color: var(--muted); font-weight: 500; }
+
+/* Busca por produto em destaque (laranja): é o campo mais usado, tem que saltar aos olhos */
+.field:has(#qProd) { background: linear-gradient(135deg, #f08a3c, #e87722); border-color: #d1650f;
+  box-shadow: 0 6px 18px rgba(232,119,34,.45); }
+.field:has(#qProd) label { color: #fff; opacity: .95; }
+.field:has(#qProd) input { color: #fff; font-weight: 600; }
+.field:has(#qProd) input::placeholder { color: rgba(255,255,255,.85); font-weight: 500; }
+.field:has(#qProd):focus-within { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.7), 0 6px 18px rgba(232,119,34,.55); }
