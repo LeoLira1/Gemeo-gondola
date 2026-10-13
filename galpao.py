@@ -274,7 +274,7 @@ def escada() -> dict:
 # desenho. A altura máxima é a de 2 níveis (palete + 2 racks). A distância até o nº 25 é estimativa.
 LAVA_OLHOS_PARTE = 1
 LAVA_OLHOS_REFERENCIA = 25
-LAVA_OLHOS_RECUO = 2.60          # da lateral do nº 25 até o pé do chuveiro
+LAVA_OLHOS_RECUO = 1.20          # da lateral do nº 25 até o pé do chuveiro (mais para dentro, para a parede chegar perto)
 LAVA_OLHOS_NIVEIS = 2
 
 
