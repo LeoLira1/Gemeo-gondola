@@ -195,7 +195,7 @@ const DIR = new THREE.Vector3(0.12, 1.05, 0.5).normalize();
 let tween = null;
 function voarPara(alvo, pos, dur = 700) { tween = { t0: performance.now(), dur, p0: camera.position.clone(), t_0: controls.target.clone(), p1: pos, t1: alvo }; }
 const _cam = new THREE.PerspectiveCamera();
-const FAIXA = { xMax: 0.95, yMax: 0.62, yMin: -0.8 };
+const FAIXA = { xMax: 0.95, yMax: 0.82, yMin: -0.8 };
 function projetar(alvo, dist, cantos) {
   _cam.fov = camera.fov; _cam.aspect = camera.aspect; _cam.near = 0.1; _cam.far = 2000; _cam.updateProjectionMatrix();
   _cam.position.copy(alvo).addScaledVector(DIR, dist); _cam.lookAt(alvo); _cam.updateMatrixWorld(); _cam.matrixWorldInverse.copy(_cam.matrixWorld).invert();

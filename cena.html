@@ -13,9 +13,9 @@
       <div class="panel seg" id="partes"></div>
       <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129, escada, chuveiro" autocomplete="off"></div>
       <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
+      <div class="panel chips" id="chips"></div>
       <span id="msg"></span>
     </div>
-    <div class="row"><div class="panel chips" id="chips"></div></div>
   </div>
   <div id="info" class="panel"></div>
   <div id="legend" class="panel">
@@ -389,7 +389,7 @@ function voarPara(alvo, pos, dur = 650) {
   tween = { t0: performance.now(), dur, p0: camera.position.clone(), t_0: controls.target.clone(), p1: pos, t1: alvo };
 }
 const _cam = new THREE.PerspectiveCamera();
-const FAIXA = { xMax: 0.95, yMax: 0.72, yMin: -0.82 };   // folga p/ a barra de cima e a legenda
+const FAIXA = { xMax: 0.95, yMax: 0.9, yMin: -0.86 };   // folga p/ a barra de cima (compacta, 1 linha) e a legenda
 // Caixa (área × altura da pilha) projetada na câmera para uma distância: {x, yMin, yMax} em NDC.
 function projetar(alvo, dist, cantos) {
   _cam.fov = camera.fov; _cam.aspect = camera.aspect; _cam.near = 0.1; _cam.far = 1000;
