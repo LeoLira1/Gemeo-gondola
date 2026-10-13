@@ -84,11 +84,14 @@ def carregar() -> tuple[dict, str | None, str | None]:
         return dd.tudo_exemplo(), None, f"erro ao ler o Turso ({type(e).__name__})"
 
 
-def _texturas_parede() -> str:
+def _texturas() -> str:
     # as cenas rodam num iframe (srcdoc): sem caminho relativo, então as imagens vão embutidas em base64
     try:
-        uri = {k: "data:image/jpeg;base64," + base64.b64encode((TEXTURAS / f"reboco_{k}.jpg").read_bytes()).decode()
-               for k in ("cor", "normal")}
+        uri = {
+            area: {k: "data:image/jpeg;base64," + base64.b64encode((TEXTURAS / f"{arq}_{k}.jpg").read_bytes()).decode()
+                   for k in ("cor", "normal")}
+            for area, arq in (("parede", "reboco"), ("piso", "piso"))
+        }
     except OSError:
         return "null"
     return json.dumps(uri)
@@ -108,7 +111,7 @@ def cena_html(dados: dict, mapa: str, indice: list, estocados: dict) -> str:
     html = CENAS[mapa].read_text(encoding="utf-8")
     html = html.replace("/*__UI_CSS__*/", UI_CSS.read_text(encoding="utf-8"), 1)
     html = html.replace("/*__UI_JS__*/", UI_JS.read_text(encoding="utf-8"), 1)
-    html = html.replace("/*__TEX_PAREDE__*/null", _texturas_parede(), 1)
+    html = html.replace("/*__TEXTURAS__*/null", _texturas(), 1)
     return html.replace("/*__DADOS__*/null", payload, 1)
 
 
