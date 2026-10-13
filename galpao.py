@@ -291,39 +291,43 @@ def lava_olhos() -> dict:
 
 
 # ── Mesa de expedição com gaveteiro (referência, não é endereço) ────────────
-# Fica no Galpão Parte 2, na ponta da Rua 12, além do nº 119 (no ponto marcado no desenho). O tampo corre
-# alinhado à rua; a frente da mesa (onde se trabalha) dá para o lado leste, o do corredor da Rua 11, e o
-# gaveteiro fica em L, encostado na lateral do lado do 119. Medidas do protótipo; o recuo é estimativa.
+# Fica no Galpão Parte 2, na ponta da Rua 12, além do nº 119 (no ponto marcado no desenho). Mesa reta com as
+# duas laterais em painel cheio e painel de fundo; o gaveteiro (2 gavetas + 1 de pasta) fica solto ao lado
+# dela, do lado do 119, um pouco à frente. A frente dá para o leste, o corredor da Rua 11.
+# Medidas do modelo; o recuo é estimativa.
 MESA_PARTE = 2
 MESA_REFERENCIA = 119
-MESA_RECUO = 0.60            # da ponta do nº 119 até a lateral da mesa
+MESA_RECUO = 0.60            # da ponta do nº 119 até a lateral do gaveteiro
 MESA_COMPRIMENTO = 1.50
 MESA_PROFUNDIDADE = 0.70
 MESA_ALTURA = 0.75
-MESA_BALANCO = 0.40          # tampo em balanço na ponta livre, sobre o pé tubular
 GAVETEIRO_LARGURA = 0.45
-GAVETEIRO_PROFUNDIDADE = 0.50
-GAVETEIRO_GAVETAS = 4
+GAVETEIRO_PROFUNDIDADE = 0.55
+GAVETEIRO_ALTURA = 0.68
+GAVETEIRO_FOLGA = 0.01       # entre a lateral da mesa e o gaveteiro
+GAVETEIRO_AVANCO = 0.06      # a frente do gaveteiro passa um pouco da frente da mesa
 
 
 def mesa() -> dict:
-    """Mesa no chão (metros). `z_ini` é a lateral do lado do 119 (onde fica o gaveteiro), `sentido` aponta
-    para a ponta livre; `x_fundo` é o fundo do tampo e `frente` o lado para onde a mesa (e o gaveteiro) avança."""
+    """Mesa + gaveteiro no chão (metros). `z_ini` é a ponta do lado do 119 (a do gaveteiro), `sentido` aponta
+    para a ponta livre; `x_fundo` é o fundo da mesa e `frente` o lado para onde ela olha."""
     p = POSICAO_POR_NUMERO[MESA_REFERENCIA]
     ps = [q for q in POSICOES if q.rua is p.rua]
     sentido = 1 if p.z >= max(q.z for q in ps) else -1        # para fora da fileira
     z_ini = p.z + sentido * (p.tamanho_z / 2 + MESA_RECUO)
     frente = -p.rua.lado_corredor                             # o corredor da própria rua fica atrás
     x_fundo = p.x - frente * p.tamanho_x / 2                   # fundo alinhado à face do rack
-    prof_total = MESA_PROFUNDIDADE + GAVETEIRO_PROFUNDIDADE
+    comp_total = MESA_COMPRIMENTO + GAVETEIRO_FOLGA + GAVETEIRO_LARGURA
+    prof_total = max(MESA_PROFUNDIDADE, MESA_PROFUNDIDADE + GAVETEIRO_AVANCO)
     xs = sorted((x_fundo, x_fundo + frente * prof_total))
-    zs = sorted((z_ini, z_ini + sentido * MESA_COMPRIMENTO))
+    zs = sorted((z_ini, z_ini + sentido * comp_total))
     return {
         "parte": MESA_PARTE, "ref": MESA_REFERENCIA, "rua": p.rua.numero,
         "x_fundo": round(x_fundo, 4), "frente": frente,
         "z_ini": round(z_ini, 4), "sentido": sentido,
         "x0": round(xs[0], 4), "x1": round(xs[1], 4), "z0": round(zs[0], 4), "z1": round(zs[1], 4),
         "comprimento": MESA_COMPRIMENTO, "profundidade": MESA_PROFUNDIDADE, "altura": MESA_ALTURA,
-        "balanco": MESA_BALANCO,
-        "gaveteiro": {"largura": GAVETEIRO_LARGURA, "profundidade": GAVETEIRO_PROFUNDIDADE, "gavetas": GAVETEIRO_GAVETAS},
+        "comprimento_total": round(comp_total, 4),
+        "gaveteiro": {"largura": GAVETEIRO_LARGURA, "profundidade": GAVETEIRO_PROFUNDIDADE, "altura": GAVETEIRO_ALTURA,
+                      "folga": GAVETEIRO_FOLGA, "avanco": GAVETEIRO_AVANCO, "gavetas": 3},
     }
