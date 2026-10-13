@@ -326,7 +326,7 @@ def test_mesa_na_ponta_da_rua_12_alem_do_119():
     p = g.POSICAO_POR_NUMERO[119]
     assert m["parte"] == 2 and m["rua"] == 12
     assert m["z0"] > p.z + p.tamanho_z / 2                                   # depois da ponta do 119
-    assert abs((m["z1"] - m["z0"]) - (g.MESA_COMPRIMENTO + g.GAVETEIRO_FOLGA + g.GAVETEIRO_LARGURA)) < 1e-6
+    assert abs((m["z1"] - m["z0"]) - g.MESA_COMPRIMENTO) < 1e-6
     assert abs((m["x1"] - m["x0"]) - (g.MESA_PROFUNDIDADE + g.GAVETEIRO_AVANCO)) < 1e-6
     for q in g.POSICOES:                                                     # não invade nenhum rack
         assert not (m["x0"] < q.x + q.tamanho_x / 2 and m["x1"] > q.x - q.tamanho_x / 2

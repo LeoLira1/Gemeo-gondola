@@ -442,7 +442,7 @@ if (D.lavaolhos) {
 
 // Mesa de expedição (referência): Parte 2, na ponta da Rua 12, além do nº 119.
 // Mesa reta com as duas laterais em painel cheio (perfil de alumínio na quina da frente), painel de fundo recuado,
-// e gaveteiro solto ao lado (2 gavetas + 1 de pasta, com fechadura), um pouco mais baixo e à frente.
+// sem pé de ferro, e gaveteiro embaixo do tampo (2 gavetas + 1 de pasta, com fechadura), junto à lateral do lado do 119.
 // Coordenadas locais: X ao longo da mesa (0 = ponta livre, Lt = lado do 119), Y altura, Z do fundo para a frente.
 const mesa = { grupo: new THREE.Group(), malhas: [], d: D.mesa };
 if (D.mesa) {
@@ -462,8 +462,8 @@ if (D.mesa) {
   caixa(-0.004, 0, PR - 0.035, 0.012, topY, 0.03, cor.perfil);                                  // perfil de alumínio na quina da frente
   caixa(-0.004, 0.18, PR - 0.008, 0.014, topY - 0.36, 0.01, 0x7f868f);                          // rasgo do perfil
   caixa(CHAPA, topY * 0.30, 0.10, L - 2 * CHAPA, topY * 0.70, 0.018, cor.fundo);               // painel de fundo recuado
-  // gaveteiro solto ao lado da mesa
-  const gx = L + G.folga, gz = PR + G.avanco - GP;
+  // gaveteiro embaixo do tampo, encostado na lateral do lado do 119, avançando um pouco à frente
+  const gx = L - CHAPA - G.folga - GL, gz = PR + G.avanco - GP;
   caixa(gx, 0.04, gz, GL, GH - 0.065, GP, cor.corpo);                                           // corpo
   caixa(gx - 0.005, GH - 0.025, gz - 0.005, GL + 0.01, 0.025, GP + 0.01, cor.tampo);           // tampo do gaveteiro
   const util = GH - 0.09, hp = util * 0.21;                                                     // 2 gavetas rasas + 1 de pasta
@@ -838,7 +838,7 @@ function verHover() {
     t("b", "Mesa de expedição");
     t("div", `Referência · na ponta da Rua ${Ms.rua}, além do nº ${Ms.ref}`, "s");
     t("div", `Tampo ${m2(Ms.comprimento)} × ${m2(Ms.profundidade)} m · altura ${m2(Ms.altura)} m`, "s");
-    t("div", "Gaveteiro ao lado: 2 gavetas + 1 de pasta", "s");
+    t("div", "Gaveteiro embaixo do tampo: 2 gavetas + 1 de pasta", "s");
     hoverBox.scale.set(cx.w + 0.06, cx.h + 0.06, cx.d + 0.06);
     hoverBox.position.set(cx.x, cx.h / 2, cx.z);
   } else if (ud.lavaolhos) {
