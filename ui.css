@@ -103,3 +103,6 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 .field:has(#qProd):focus-within { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.7), 0 6px 18px rgba(232,119,34,.55); }
 
 #bGirar { position: absolute; right: 12px; top: 12px; z-index: 5; min-height: 32px; width: 32px; padding: 0; border-radius: 10px; font-size: 16px; line-height: 1; }
+
+/* Sem legenda nem resumo no rodapé: a maquete fica com a tela toda */
+#legend, #bLeg, #stats { display: none !important; }
