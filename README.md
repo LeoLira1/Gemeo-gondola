@@ -23,6 +23,10 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 - **Chuveiro lava-olhos (referência):** equipamento de emergência verde na Parte 1, alinhado à Rua 2 e além do nº 25, com
   altura de até 2 níveis (2,38 m). Digite `chuveiro` no campo Nº para ir até ele. A distância ao nº 25 é estimativa
   (`galpao.py`).
+- **Mesa de expedição (referência):** no Galpão Parte 2, na ponta da Rua 12, além do nº 119. Mesa reta de 1,50 × 0,70 m
+  (0,75 m de altura), com as duas laterais em painel cheio (sem pé de ferro) e painel de fundo, e gaveteiro embaixo do
+  tampo (2 gavetas + 1 de pasta) do lado do 119. A frente dá para o corredor da Rua 11. Digite `mesa` no campo Nº para ir até ela. Medidas e
+  recuo (0,60 m) estão em `galpao.py`.
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
   Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 44 × 4), Barracão (paletes com bag ÷ 100) e Loja
   (faixas de endereço com produto ÷ 292: gôndola = 3 andares × 6 faces, estante = um por nível). O resumo do canto do
