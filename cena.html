@@ -398,11 +398,13 @@ if (D.escada) {
   for (const x of [E.x0 + 0.05, E.x1 - 0.05]) caixaE(x - 0.04, x + 0.04, 0, H - 0.1, E.z1 - sent * 0.06, E.z1 - sent * 0.14, corLat);   // pés do patamar
   // corrimão no lado aberto (o do corredor): postes + barra inclinada que segue os degraus
   const xr = E.lado > 0 ? E.x0 + 0.03 : E.x1 - 0.03, hr = 0.95;
-  for (let i = 0; i <= n; i += 3) caixaE(xr - 0.02, xr + 0.02, (Math.min(i + 1, n) * H) / (n + 1), (Math.min(i + 1, n) * H) / (n + 1) + hr, zDe(i) - 0.02, zDe(i) + 0.02, corLat);
+  for (let i = 0; i < n; i += 3) caixaE(xr - 0.02, xr + 0.02, ((i + 1) * H) / (n + 1), ((i + 1) * H) / (n + 1) + hr, zDe(i) - 0.02, zDe(i) + 0.02, corLat);
+  caixaE(xr - 0.02, xr + 0.02, H - 0.1, H + hr, zDe(n) - 0.02, zDe(n) + 0.02, corLat);                                                     // poste na quebra entre a escada e o patamar
   const dz = (n * run) * sent, dy = H - H / (n + 1), len = Math.hypot(dz, dy);
   const rail = new THREE.Mesh(boxGeo(0.05, 0.05, len), mat(corLat));
   rail.position.set(xr, H / (n + 1) + hr + dy / 2, E.z0 + dz / 2); rail.rotation.x = -Math.atan2(dy, Math.abs(dz)) * sent;
   rail.castShadow = true; rail.userData.escada = true; escada.grupo.add(rail); escada.malhas.push(rail);
+  caixaE(xr - 0.025, xr + 0.025, H + hr - 0.05, H + hr, zDe(n), E.z1 - sent * 0.01, corLat);                                   // corrimão reto sobre o patamar, fechando o da escada
   caixaE(xr - 0.02, xr + 0.02, H, H + hr, E.z1 - sent * 0.03, E.z1 - sent * 0.03 + sent * 0.04, corLat);                                    // poste do patamar
   scene.add(escada.grupo);
   escada.caixa = { x: (E.x0 + E.x1) / 2, z: (E.z0 + E.z1) / 2, w: E.x1 - E.x0, d: L, h: H };
@@ -605,8 +607,8 @@ function portaVeneziana(xParede, lado, zCentro, yBase) {
   const caixa = (w, h, d, x, y, z, m, rx = 0) => {
     const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.x = rx; g.add(o); return o;
   };
-  const claro = mat(0xe9e8e4), grafite = mat(0x34373b, { roughness: 0.5, metalness: 0.45 });
-  const ripa = mat(0x676b71, { roughness: 0.45, metalness: 0.5 }), inox = mat(0xb9bdc3, { roughness: 0.35, metalness: 0.6 });
+  const claro = mat(0xf3f2ee), grafite = mat(0x8e949b, { roughness: 0.5, metalness: 0.45 });
+  const ripa = mat(0xd2d6db, { roughness: 0.45, metalness: 0.5 }), inox = mat(0xb9bdc3, { roughness: 0.35, metalness: 0.6 });
   caixa(B, A, 0.07, -(W + B) / 2, A / 2, 0.035, claro); caixa(B, A, 0.07, (W + B) / 2, A / 2, 0.035, claro);   // batente
   caixa(W + 2 * B, B, 0.07, 0, A + B / 2, 0.035, claro);
   caixa(W, A, 0.03, 0, A / 2, 0.02, grafite);                                                                 // folha
