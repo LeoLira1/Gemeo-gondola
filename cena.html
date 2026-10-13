@@ -45,6 +45,7 @@ const PALETE_H = 0.12;                       // palete de madeira sob a pilha
 const state = { parte: 1, rua: null, sel: null, matched: new Set(), hover: null };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 const $ = (id) => document.getElementById(id);
+const qNum = $("qNum");                    // o campo pode ser levado para a página (levarNumParaPagina)
 const fold = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const posPorN = new Map(D.posicoes.map((p) => [p.n, p]));
@@ -752,16 +753,49 @@ function mostrarInfo(c) {
     : `<div class="lv"><span></span><span>Vaga livre</span></div>`;
   el.innerHTML = `<button class="x" title="Fechar">×</button><h4>Posição ${p.n} · Rua ${p.r} · Parte ${p.p}</h4>${linhas}`;
   el.style.display = "block";
-  el.querySelector(".x").onclick = () => { state.sel = null; $("qNum").value = ""; refrescar(); };
+  el.querySelector(".x").onclick = () => { state.sel = null; qNum.value = ""; refrescar(); };
 }
 function hideInfo() { $("info").style.display = "none"; }
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
+// Campo Nº: vai para a faixa de indicadores da página (ao lado do "Galpão 2"), liberando a barra do mapa.
+// O iframe do Streamlit é same-origin (srcdoc + allow-same-origin); se o acesso falhar, o campo fica aqui.
+function levarNumParaPagina() {
+  let pd;
+  try { pd = window.parent !== window && window.parent.document; } catch (e) { return; }
+  if (!pd || !pd.querySelector(".stats")) return;
+  if (!pd.getElementById("camda-qnum-css")) {
+    const css = pd.createElement("style"); css.id = "camda-qnum-css";
+    css.textContent = `#camda-qnum{display:inline-flex;align-items:center;gap:.5rem;flex:1 1 150px;max-width:360px;cursor:text}
+#camda-qnum b{font-size:.72rem;letter-spacing:.06em;color:#8a877f}
+#camda-qnum input{border:0;outline:0;background:transparent;font:inherit;font-size:.9rem;color:#2b2a27;width:100%;min-width:0;padding:0}
+#camda-qnum:focus-within{border-color:#e87722;box-shadow:0 0 0 3px rgba(232,119,34,.22)}`;
+    pd.head.appendChild(css);
+  }
+  pd.getElementById("camda-qnum")?.remove();                   // sobra de uma cena anterior
+  const caixa = qNum.parentElement;
+  const wrap = pd.createElement("label");
+  wrap.id = "camda-qnum"; wrap.className = "stat";
+  wrap.innerHTML = "<b>Nº</b>";
+  wrap.appendChild(pd.adoptNode(qNum));
+  caixa.remove();
+  const encaixar = () => {                                      // depois do 2º indicador (Galpão 2); refaz se o Streamlit redesenhar a faixa
+    const stats = pd.querySelector(".stats");
+    if (!stats || wrap.parentElement === stats) return;
+    const pcts = stats.querySelectorAll(".stat.pct");
+    if (pcts[1]) pcts[1].after(wrap); else stats.appendChild(wrap);
+  };
+  encaixar();
+  const t = setInterval(encaixar, 1000);
+  window.addEventListener("pagehide", () => { clearInterval(t); wrap.remove(); });
+}
+levarNumParaPagina();
+
 let tNum = null;
-$("qNum").addEventListener("input", () => {
+qNum.addEventListener("input", () => {
   clearTimeout(tNum);
   tNum = setTimeout(() => {
-    const v = $("qNum").value.trim();
+    const v = qNum.value.trim();
     if (!v) { state.sel = null; refrescar(); return; }
     const n = parseInt(v, 10);
     if (/^\d+$/.test(v) && posPorN.has(n)) irParaPosicao(n);
@@ -770,14 +804,14 @@ $("qNum").addEventListener("input", () => {
     else if (/^mesa/i.test(v)) irParaMesa();
   }, 350);
 });
-$("qNum").addEventListener("keydown", (e) => {
+qNum.addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
   clearTimeout(tNum);
-  const n = parseInt($("qNum").value, 10);
+  const n = parseInt(qNum.value, 10);
   if (posPorN.has(n)) irParaPosicao(n);
-  else if (/^esc/i.test($("qNum").value.trim())) irParaEscada();
-  else if (/^(chuv|lava)/i.test($("qNum").value.trim())) irParaLavaOlhos();
-  else if (/^mesa/i.test($("qNum").value.trim())) irParaMesa();
+  else if (/^esc/i.test(qNum.value.trim())) irParaEscada();
+  else if (/^(chuv|lava)/i.test(qNum.value.trim())) irParaLavaOlhos();
+  else if (/^mesa/i.test(qNum.value.trim())) irParaMesa();
 });
 
 // ── Busca por produto ───────────────────────────────────────────────────────
@@ -893,7 +927,7 @@ canvas.addEventListener("click", (e) => {
   mouse.set(((e.clientX - rc.left) / rc.width) * 2 - 1, -((e.clientY - rc.top) / rc.height) * 2 + 1);
   ray.setFromCamera(mouse, camera);
   const hit = ray.intersectObjects(alvos, false)[0];
-  if (hit && !moveu && hit.object.userData.n) { state.sel = hit.object.userData.n; $("qNum").value = String(state.sel); atualizarSelecao(); pintar(); }
+  if (hit && !moveu && hit.object.userData.n) { state.sel = hit.object.userData.n; qNum.value = String(state.sel); atualizarSelecao(); pintar(); }
 });
 let moveu = false, down = null;
 canvas.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; moveu = false; });
