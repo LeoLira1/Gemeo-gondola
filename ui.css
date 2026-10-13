@@ -101,3 +101,5 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 .field:has(#qProd) input { color: #fff; font-weight: 600; }
 .field:has(#qProd) input::placeholder { color: rgba(255,255,255,.85); font-weight: 500; }
 .field:has(#qProd):focus-within { border-color: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.7), 0 6px 18px rgba(232,119,34,.55); }
+
+#bGirar { position: absolute; right: 12px; top: 12px; z-index: 5; min-height: 32px; width: 32px; padding: 0; border-radius: 10px; font-size: 16px; line-height: 1; }
