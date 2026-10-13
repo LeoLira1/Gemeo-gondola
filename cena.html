@@ -11,7 +11,7 @@
   <div id="top">
     <div class="row">
       <div class="panel seg" id="partes"></div>
-      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129, escada, chuveiro" autocomplete="off"></div>
+      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129, escada, chuveiro, mesa" autocomplete="off"></div>
       <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
       <div class="panel chips" id="chips"></div>
       <span id="msg"></span>
@@ -27,6 +27,7 @@
     <span><i style="background:transparent;border:1px dashed #8d8b85"></i>Vaga livre</span>
     <span><i style="background:#cfd3d8"></i>Escada p/ mesanino</span>
     <span><i style="background:#1b8a4a"></i>Chuveiro lava-olhos</span>
+    <span><i style="background:#cecbc3"></i>Mesa de expedição</span>
   </div>
   <div id="stats" class="panel"></div>
   <div id="tip"></div>
@@ -439,6 +440,60 @@ if (D.lavaolhos) {
   hit.position.set(lavaolhos.caixa.x, H / 2, lavaolhos.caixa.z); hit.userData.lavaolhos = true; scene.add(hit); lavaolhos.malhas.push(hit); lavaolhos.hit = hit;
 }
 
+// Mesa de expedição com gaveteiro em L (referência): Parte 2, na ponta da Rua 12, além do nº 119.
+// Mesmo desenho do protótipo: tampo laminado cinza, corpo branco, painel frontal recuado, pé tubular sob o balanço.
+// Coordenadas locais do protótipo: X ao longo do tampo (0 = ponta livre, L = lado do 119), Y altura, Z do fundo para a frente.
+const mesa = { grupo: new THREE.Group(), malhas: [], d: D.mesa };
+if (D.mesa) {
+  const Ms = D.mesa, L = Ms.comprimento, PR = Ms.profundidade, H = Ms.altura, B = Ms.balanco;
+  const G = Ms.gaveteiro, GL = G.largura, GP = G.profundidade, GN = G.gavetas;
+  const TAMPO = 0.035, CHAPA = 0.022;
+  const cor = { tampo: 0xcecbc3, corpo: 0xe8e6e0, gaveta: 0xf0eee8, puxador: 0x969ca3, metal: 0xb0b6bd, rodizio: 0x26292f,
+    frasco: 0x286ec4, tampaF: 0xe8e8e8, galao: 0xeceeec, papel: 0xf5f3ec, luva: 0xc4b496 };
+  const wx = (Z) => Ms.x_fundo + Ms.frente * Z, wz = (X) => Ms.z_ini + Ms.sentido * (L - X);
+  const caixa = (x, y, z, w, h, d, c) => {
+    const m = addBoxTo(mesa.grupo, Math.min(wx(z), wx(z + d)), Math.max(wx(z), wx(z + d)), y, y + h,
+      Math.min(wz(x), wz(x + w)), Math.max(wz(x), wz(x + w)), c);
+    m.userData.mesa = true; mesa.malhas.push(m); return m;
+  };
+  const tubo = (x, z, r, y, h, c, seg = 12) => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, seg), mat(c));
+    m.position.set(wx(z), y + h / 2, wz(x)); m.castShadow = m.receiveShadow = true;
+    m.userData.mesa = true; mesa.grupo.add(m); mesa.malhas.push(m); return m;
+  };
+  const topY = H - TAMPO, bodyW = L - B;
+  caixa(0, topY, 0, L, TAMPO, PR, cor.tampo);                                                   // tampo
+  caixa(L - CHAPA, 0.02, 0.03, CHAPA, topY - 0.02, PR - 0.06, cor.corpo);                       // lateral do lado do 119
+  caixa(B, 0.02, 0.03, CHAPA, topY - 0.02, PR - 0.06, cor.corpo);                               // lateral interna do corpo
+  const pfH = (topY - 0.02) * 0.55;
+  caixa(B + CHAPA, topY - 0.02 - pfH, PR - 0.11, bodyW - 2 * CHAPA, pfH, CHAPA, cor.corpo);     // painel frontal recuado
+  caixa(B + CHAPA, topY - 0.16, 0.05, bodyW - 2 * CHAPA, 0.14, CHAPA, cor.corpo);               // travessa de fundo
+  tubo(0.10, PR - 0.14, 0.018, 0, topY, cor.metal);                                              // pé tubular sob o balanço
+  tubo(0.10, PR - 0.14, 0.028, 0, 0.02, cor.rodizio);
+  // gaveteiro em L, encostado na lateral e avançando para a frente
+  const gH = H - 0.04, gx = L - GL, gz = PR - 0.04;
+  caixa(gx, 0.045, gz, GL, gH - 0.075, GP, cor.corpo);                                         // corpo (até o tampo do gaveteiro)
+  caixa(gx - 0.008, gH - 0.03, gz - 0.008, GL + 0.016, 0.03, GP + 0.016, cor.tampo);
+  const gh = (gH - 0.10) / GN;
+  for (let i = 0; i < GN; i++) {
+    const y = 0.06 + i * gh;
+    caixa(gx + 0.006, y, gz + GP, GL - 0.012, gh - 0.008, 0.016, cor.gaveta);                   // frente da gaveta
+    caixa(gx + GL * 0.34, y + gh * 0.62, gz + GP + 0.016, GL * 0.40, 0.022, 0.012, cor.puxador); // puxador
+  }
+  for (const [a, b] of [[gx + 0.06, gz + 0.06], [gx + GL - 0.06, gz + 0.06], [gx + 0.06, gz + GP - 0.06], [gx + GL - 0.06, gz + GP - 0.06]])
+    tubo(a, b, 0.022, 0, 0.045, cor.rodizio, 8);                                                 // rodízios
+  // objetos sobre o tampo
+  for (const f of [0.60, 0.70]) { tubo(L * f, PR * 0.30, 0.038, H, 0.24, cor.frasco); tubo(L * f, PR * 0.30, 0.020, H + 0.24, 0.05, cor.tampaF, 8); }
+  caixa(L * 0.80, H, PR * 0.18, 0.17, 0.26, 0.13, cor.galao);                                   // galão
+  caixa(L * 0.26, H, PR * 0.52, 0.22, 0.006, 0.30, cor.papel);                                  // prancheta
+  caixa(L * 0.44, H, PR * 0.34, 0.26, 0.045, 0.17, cor.luva);                                   // luvas
+  caixa(L * 0.08, H, PR * 0.44, 0.34, 0.008, 0.05, cor.metal);                                  // régua
+  scene.add(mesa.grupo);
+  mesa.caixa = { x: (Ms.x0 + Ms.x1) / 2, z: (Ms.z0 + Ms.z1) / 2, w: Ms.x1 - Ms.x0, d: Ms.z1 - Ms.z0, h: H + 0.3 };
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(mesa.caixa.w, mesa.caixa.h, mesa.caixa.d), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.set(mesa.caixa.x, mesa.caixa.h / 2, mesa.caixa.z); hit.userData.mesa = true; scene.add(hit); mesa.hit = hit;
+}
+
 // Seleção (busca por número) e destaque de hover
 const selGrupo = new THREE.Group();
 const selFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -503,6 +558,11 @@ function atualizarVisibilidade() {
     lavaolhos.grupo.visible = naParteLv;
     if (naParteLv) alvos.push(lavaolhos.hit);
   }
+  if (D.mesa) {
+    const naParteMesa = state.parte === D.mesa.parte;
+    mesa.grupo.visible = naParteMesa;
+    if (naParteMesa) alvos.push(mesa.hit);
+  }
   dirty = true;
 }
 
@@ -521,6 +581,10 @@ function envelope(filtro) {
   if (D.lavaolhos && filtro({ p: D.lavaolhos.parte, r: D.lavaolhos.rua })) {      // o chuveiro também entra no enquadramento
     a.minX = Math.min(a.minX, D.lavaolhos.x - 0.4); a.maxX = Math.max(a.maxX, D.lavaolhos.x + 0.9);
     a.minZ = Math.min(a.minZ, D.lavaolhos.z - 0.4); a.maxZ = Math.max(a.maxZ, D.lavaolhos.z + 0.4);
+  }
+  if (D.mesa && filtro({ p: D.mesa.parte, r: D.mesa.rua })) {      // a mesa também entra no enquadramento
+    a.minX = Math.min(a.minX, D.mesa.x0); a.maxX = Math.max(a.maxX, D.mesa.x1);
+    a.minZ = Math.min(a.minZ, D.mesa.z0); a.maxZ = Math.max(a.maxZ, D.mesa.z1);
   }
   return a;
 }
@@ -667,6 +731,13 @@ function irParaLavaOlhos() {
   const cx = lavaolhos.caixa, alvo = new THREE.Vector3(cx.x, cx.h / 2, cx.z);
   voarPara(alvo, alvo.clone().addScaledVector(DIR, 9));
 }
+function irParaMesa() {
+  if (!D.mesa) return;
+  state.sel = null; state.parte = D.mesa.parte; state.rua = null;
+  refrescar();
+  const cx = mesa.caixa, alvo = new THREE.Vector3(cx.x, cx.h / 2, cx.z);
+  voarPara(alvo, alvo.clone().addScaledVector(DIR, 6));
+}
 function irParaEscada() {
   if (!D.escada) return;
   state.sel = null; state.parte = D.escada.parte; state.rua = null;
@@ -708,6 +779,7 @@ $("qNum").addEventListener("input", () => {
     if (/^\d+$/.test(v) && posPorN.has(n)) irParaPosicao(n);
     else if (/^esc/i.test(v)) irParaEscada();
     else if (/^(chuv|lava)/i.test(v)) irParaLavaOlhos();
+    else if (/^mesa/i.test(v)) irParaMesa();
   }, 350);
 });
 $("qNum").addEventListener("keydown", (e) => {
@@ -717,6 +789,7 @@ $("qNum").addEventListener("keydown", (e) => {
   if (posPorN.has(n)) irParaPosicao(n);
   else if (/^esc/i.test($("qNum").value.trim())) irParaEscada();
   else if (/^(chuv|lava)/i.test($("qNum").value.trim())) irParaLavaOlhos();
+  else if (/^mesa/i.test($("qNum").value.trim())) irParaMesa();
 });
 
 // ── Busca por produto ───────────────────────────────────────────────────────
@@ -769,10 +842,18 @@ function verHover() {
   const hit = ray.intersectObjects(alvos, false)[0];
   if (!hit) { tip.style.display = "none"; hoverBox.visible = false; canvas.style.cursor = ""; dirty = true; return; }
   const o = hit.object, ud = o.userData, c = casas.get(ud.n);
-  canvas.style.cursor = (ud.escada || ud.lavaolhos) ? "help" : "pointer";
+  canvas.style.cursor = (ud.escada || ud.lavaolhos || ud.mesa) ? "help" : "pointer";
   tip.textContent = "";
   const t = (tag, txt, cls) => { const el = document.createElement(tag); el.textContent = txt; if (cls) el.className = cls; tip.appendChild(el); return el; };
-  if (ud.lavaolhos) {
+  if (ud.mesa) {
+    const Ms = D.mesa, cx = mesa.caixa, m2 = (v) => v.toFixed(2).replace(".", ",");
+    t("b", "Mesa de expedição");
+    t("div", `Referência · na ponta da Rua ${Ms.rua}, além do nº ${Ms.ref}`, "s");
+    t("div", `Tampo ${m2(Ms.comprimento)} × ${m2(Ms.profundidade)} m · altura ${m2(Ms.altura)} m`, "s");
+    t("div", `Gaveteiro em L com ${Ms.gaveteiro.gavetas} gavetas`, "s");
+    hoverBox.scale.set(cx.w + 0.06, cx.h + 0.06, cx.d + 0.06);
+    hoverBox.position.set(cx.x, cx.h / 2, cx.z);
+  } else if (ud.lavaolhos) {
     const Lv = D.lavaolhos, cx = lavaolhos.caixa;
     t("b", "Chuveiro lava-olhos");
     t("div", `Equipamento de emergência · na ponta da Rua ${Lv.rua}, além do nº 25`, "s");
@@ -903,7 +984,7 @@ redimensionar();
 refrescar();
 enquadrarVista(false);
 requestAnimationFrame(frame);
-window.__galpao = { state, casas, D, escada, lavaolhos, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
+window.__galpao = { state, casas, D, escada, lavaolhos, mesa, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
 /*__UI_JS__*/
 </script>
 </body>

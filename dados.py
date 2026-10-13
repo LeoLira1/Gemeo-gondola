@@ -200,6 +200,7 @@ def montar(
         "catalogo": es.catalogo_da_cena(catalogo, catalogo_est),
         "escada": g.escada(),
         "lavaolhos": g.lava_olhos(),
+        "mesa": g.mesa(),
     }
 
 
