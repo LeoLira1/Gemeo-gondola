@@ -1,15 +1,6 @@
-// Interface compartilhada: legenda recolhível e botão que oculta os rótulos numéricos.
+// Interface compartilhada: botão que oculta os rótulos numéricos.
 (function () {
   const $$ = (id) => document.getElementById(id);
-  const leg = $$("legend");
-  if (leg) {
-    const b = document.createElement("button");
-    b.id = "bLeg"; b.className = "btn"; b.textContent = "Legenda";
-    const abrir = (v) => { leg.classList.toggle("fechada", !v); b.classList.toggle("on", v); };
-    abrir(window.innerWidth >= 1100);
-    b.onclick = () => abrir(leg.classList.contains("fechada"));
-    $$("wrap").appendChild(b);
-  }
   const campo = $$("qProd");
   const linha = (campo && campo.closest(".row")) || $$("top");
   const n = document.createElement("button");
