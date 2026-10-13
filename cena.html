@@ -576,7 +576,7 @@ function envelope(filtro) {
   }
   return a;
 }
-// Paredes do Galpão 2: fecham o perímetro da laje (fundo, as duas pontas e a frente). Cada painel é uma face única
+// Paredes do Galpão 2: fecham o perímetro da laje, menos a frente (Z+, lado da mesa, que fica aberta). Cada painel é uma face única
 // virada para dentro: vista de fora, a parede mais próxima da câmera some e não tapa os racks.
 const PAREDES = { parte: 2, altura: 5.0 };
 const paredes = new THREE.Group();
@@ -589,7 +589,6 @@ function montarParedes(e, margem) {
   // [centro x, centro z, comprimento, giro Y]: a normal do plano (+Z) é girada para apontar ao centro do galpão
   const lados = [
     [(x0 + x1) / 2, z0, x1 - x0, 0],                 // fundo (Z−)
-    [(x0 + x1) / 2, z1, x1 - x0, Math.PI],           // frente (Z+)
     [x0, (z0 + z1) / 2, z1 - z0, Math.PI / 2],       // ponta X−
     [x1, (z0 + z1) / 2, z1 - z0, -Math.PI / 2],      // ponta X+
   ];
