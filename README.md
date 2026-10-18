@@ -7,6 +7,9 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 `lib/codigos_vinculados.dart`. Se a planta mudar lá, atualize `galpao.py`.
 
 - **Galpão:** 129 posições, pilhas de racks, cor por saldo (vermelho/azul), busca por número e produto.
+- **Rack misto:** o Gondolas deixa até 5 produtos no mesmo palete (o primeiro em `galpao_racks`, os outros em
+  `galpao_rack_itens`). Aqui o rack misto ganha duas faixas escuras, o cartão e a dica listam todos os produtos, e a
+  busca e a cor de saldo valem para qualquer um deles. Banco sem a tabela nova: o galpão segue só com os racks.
 - **Loja (gôndolas e estantes):** planta de 10 × 14 m com as 12 gôndolas, estantes de parede, EDR-300,
   expositores MagnoJet/Nellore/Monitor, Estante Parede, balcão e os bonecos que caminham pelos corredores.
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
