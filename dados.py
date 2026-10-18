@@ -363,7 +363,7 @@ SQL_GONDOLAS = (
     "FROM gondola_layout ORDER BY produto_nome"
 )
 SQL_ESTANTES = (
-    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel FROM estante_layout "
+    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel, coluna FROM estante_layout "
     f"WHERE estante_num NOT IN ({', '.join(map(str, lj.ESTANTES_REMOVIDAS))}) "
     f"AND NOT (estante_num = {lj.NELLORE} AND nivel = 0) ORDER BY produto_nome"
 )
@@ -402,9 +402,11 @@ def loja_exemplo() -> dict[str, Any]:
             else:
                 nivel = rnd.randint(0, lj.niveis_produto(it["n"]) - 1)
                 num = it["n"] + (rnd.randint(0, 5) if it["kind"] == "parede" else 0)
-                est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel})
+                col = rnd.randint(0, lj.PRODUTOS_POR_ESPACO_ILHA - 1) if it["kind"] == "ilha" else 0
+                est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel,
+                            "coluna": col})
                 qtd.append({"produto_codigo": cod, "local_tipo": "estante", "local_num": num,
-                            "face_ou_coluna": 0, "andar_ou_nivel": nivel, "quantidade": q})
+                            "face_ou_coluna": col, "andar_ou_nivel": nivel, "quantidade": q})
     dados = lj.montar(gond, est, qtd)
     dados["avisos"] = []
     return dados

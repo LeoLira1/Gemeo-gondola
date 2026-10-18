@@ -103,7 +103,7 @@ import loja as lj
 def test_planta_da_loja():
     gond = [i for i in lj.ITENS if i["tipo"] == "gondola"]
     assert sorted(i["n"] for i in gond) == list(range(1, 13))
-    assert {i["n"] for i in lj.ITENS if i["tipo"] == "estante"} == {1, 2, 6, 7, 8, 9, 13, 19, 20, 21}
+    assert {i["n"] for i in lj.ITENS if i["tipo"] == "estante"} == {1, 2, 6, 7, 8, 9, 13, 19, 20, 21, 22}
     # tudo dentro das paredes
     tol = 0.01   # a Estante Parede do Gondolas entra 5 mm na parede (x = 0,45, w = 0,55)
     for i in lj.ITENS:
@@ -114,6 +114,51 @@ def test_planta_da_loja():
     assert abs(bal["z"] + bal["d"] / 2 - (lj.LOJA_H - lj.PAREDE_ESP)) < 1e-9
     assert lj.numero_no_mapa("estante", 16) == 13 and lj.numero_no_mapa("gondola", 16) == 16
     assert abs(lj.ALTURA_GONDOLA - 0.6492) < 1e-3
+
+
+def test_ilha_de_paletes():
+    ilha = next(i for i in lj.ITENS if i["kind"] == "ilha")
+    assert ilha["n"] == lj.ILHA == 22
+    # no corredor central, entre a G7 (caixa) e a G6 (entrada), sem encostar em gôndola
+    for gd in (i for i in lj.ITENS if i["tipo"] == "gondola"):
+        dx = max(0.0, abs(gd["x"] - ilha["x"]) - ilha["w"] / 2)
+        dz = max(0.0, abs(gd["z"] - ilha["z"]) - ilha["d"] / 2)
+        assert math.hypot(dx, dz) - lj.GONDOLA_R > 0.2, gd["n"]
+    est = [
+        {"produto_codigo": "A", "produto_nome": "PROD A", "estante_num": 22, "nivel": 2, "coluna": 1},
+        {"produto_codigo": "A", "produto_nome": "PROD A", "estante_num": 22, "nivel": 2, "coluna": 3},
+    ]
+    qtd = [
+        {"produto_codigo": "A", "local_tipo": "estante", "local_num": 22, "face_ou_coluna": 1, "andar_ou_nivel": 2, "quantidade": 7},
+        {"produto_codigo": "A", "local_tipo": "estante", "local_num": 22, "face_ou_coluna": 3, "andar_ou_nivel": 2, "quantidade": 4},
+    ]
+    out = lj.montar([], est, qtd)
+    it = next(i for i in out["itens"] if i["kind"] == "ilha")
+    assert it["rot"] == "Ilha" and it["faixas"] == 12 and it["ocupadas"] == 1
+    assert [(p["loc"], p["q"]) for p in it["prod"]] == [("Espaço 3 · produto 2", 7), ("Espaço 3 · produto 4", 4)]
+
+
+def test_rotas_nao_atravessam_estruturas():
+    def ponto(rota, s):
+        pts = list(rota) + [rota[0]]
+        for a, b in zip(pts, pts[1:]):
+            L = math.hypot(b[0] - a[0], b[1] - a[1])
+            if s <= L:
+                return a[0] + (b[0] - a[0]) * s / L, a[1] + (b[1] - a[1]) * s / L
+            s -= L
+        return pts[-1]
+    for rota in lj.ROTAS:
+        per = sum(math.hypot(b[0] - a[0], b[1] - a[1]) for a, b in zip(rota, list(rota[1:]) + [rota[0]]))
+        s = 0.0
+        while s < per:
+            x, z = ponto(rota, s)
+            for i in lj.ITENS:
+                if i["tipo"] == "gondola":
+                    assert math.hypot(x - i["x"], z - i["z"]) > lj.GONDOLA_R + 0.1
+                else:
+                    dx, dz = abs(x - i["x"]) - i["w"] / 2, abs(z - i["z"]) - i["d"] / 2
+                    assert dx > 0.1 or dz > 0.1, (x, z, i["n"])
+            s += 0.02
 
 
 def test_face_da_gondola():
@@ -150,7 +195,7 @@ def test_montar_loja_agrupa_e_ignora():
 def test_exemplo_da_loja():
     import dados as dd2
     d = dd2.loja_exemplo()
-    assert len(d["itens"]) == 22 and any(i["prod"] for i in d["itens"])
+    assert len(d["itens"]) == 23 and any(i["prod"] for i in d["itens"])
 
 
 # ── Barracão ────────────────────────────────────────────────────────────────
@@ -298,7 +343,7 @@ def test_ocupacao_da_loja_por_faixas_de_endereco():
     import loja as ljt, dados as ddp
     # 12 gôndolas × 18 (3 andares × 6 faces) + estantes por nível + Estante Parede 6 × 6
     out = ljt.montar([], [], [])
-    assert sum(i["faixas"] for i in out["itens"]) == 12 * 18 + (4 + 6 + 7 + 6 + 4 + 5 + 4 + 4) + 36
+    assert sum(i["faixas"] for i in out["itens"]) == 12 * 18 + (4 + 6 + 7 + 6 + 4 + 5 + 4 + 4) + 36 + 12
     assert next(i for i in out["itens"] if i["kind"] == "balcao")["faixas"] == 0
     # duas faces/andares na G7 (a mesma face e andar com 2 produtos conta uma vez) e um nível na E1
     gond = [
@@ -308,7 +353,7 @@ def test_ocupacao_da_loja_por_faixas_de_endereco():
     ]
     est = [{"produto_codigo": "A", "produto_nome": "A", "estante_num": 1, "nivel": 3}]
     o = ddp.ocupacao_loja(ljt.montar(gond, est, []))
-    assert o["ocupadas"] == 3 and o["total"] == 292 and o["pct"] == ddp.percentual(3, 292)
+    assert o["ocupadas"] == 3 and o["total"] == 304 and o["pct"] == ddp.percentual(3, 304)
 
 
 def test_capacidades_independentes_de_cada_area():

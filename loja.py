@@ -30,6 +30,12 @@ BALCAO = 21
 PAREDE_MIN, PAREDE_MAX = 13, 18
 ESTANTES_REMOVIDAS = (3, 4)
 PALETE_MIN = 101
+# Ilha de paletes: 12 paletes com tapume verde no corredor central, 2 de largura × 6 de comprimento,
+# 5 produtos por palete. No banco é a estante 22 com nivel = espaço (0–11) e coluna = produto (0–4).
+ILHA = 22
+ESPACOS_ILHA = 12
+COLUNAS_ESPACOS_ILHA = 2
+PRODUTOS_POR_ESPACO_ILHA = 5
 
 GONDOLA_R = 0.62
 # (raio, y do centro, altura) de cada prateleira da gôndola, na escala da cena de detalhe
@@ -56,6 +62,8 @@ _ESTRUTURAS = (
     (1, 9.45, 4.0, 0.7, 1.6),
     (PAREDE_MIN, 0.45, 10.6, 0.55, 4.4),
     (BALCAO, 1.45, _BALCAO_Z, 0.60, 7.95),
+    # Medida de mapa, não a real (2,40 × 6,00 m): na planta simplificada a ilha real encostaria nas gôndolas.
+    (ILHA, 5.0, 8.0, 1.8, 5.6),
 )
 
 REFERENCIAS = (
@@ -66,9 +74,10 @@ REFERENCIAS = (
     ("ENTRADA 2", 2.5, 13.91, True),
 )
 
-# Rotas dos bonecos (rotasLoja): funcionário e cliente, só pelos corredores.
+# Rotas dos bonecos (rotasLoja): funcionário e cliente, só pelos corredores. O funcionário
+# dá a volta na ilha de paletes, entre ela e as colunas de gôndolas.
 ROTAS = (
-    ((4.0, 5.00), (4.0, 12.85), (6.0, 12.85), (6.0, 5.00)),
+    ((3.86, 4.91), (3.86, 12.85), (6.14, 12.85), (6.14, 4.91)),
     ((8.4, 2.80), (8.4, 13.30), (2.05, 13.30), (2.05, 2.80)),
 )
 
@@ -86,6 +95,8 @@ def _kind(numero: int) -> str:
         return "monitor"
     if numero == BALCAO:
         return "balcao"
+    if numero == ILHA:
+        return "ilha"
     if PAREDE_MIN <= numero <= PAREDE_MAX:
         return "parede"
     return "estante"
@@ -113,6 +124,8 @@ def rotulo_curto(item: dict[str, Any]) -> str:
         return "Balcão"
     if item["kind"] == "parede":
         return "E13–18"
+    if item["kind"] == "ilha":
+        return "Ilha"
     return ("G" if item["tipo"] == "gondola" else "E") + str(item["n"])
 
 
@@ -128,6 +141,8 @@ def nome_estrutura(item: dict[str, Any]) -> str:
         return "Expositor Nellore (E19)"
     if k == "monitor":
         return "Expositor Monitor (E20)"
+    if k == "ilha":
+        return "Ilha de paletes (12 espaços × 5 produtos)"
     return ("Gôndola " if item["tipo"] == "gondola" else "Estante ") + str(item["n"])
 
 
@@ -149,6 +164,8 @@ def niveis_produto(numero: int) -> int:
     """niveisProdutoPara: quantos níveis a estante tem (para limitar o nível lido)."""
     if numero >= PALETE_MIN:
         return 3
+    if numero == ILHA:
+        return ESPACOS_ILHA
     if numero in (EDR300, EDR300_TRIPLA):
         return 6
     if numero == MAGNOJET:
@@ -171,7 +188,7 @@ def faixas(item: dict[str, Any]) -> int:
     """Quantas "vagas" de endereço a estrutura tem, para a capacidade da loja.
 
     Gôndola: 3 andares × 6 faces = 18. Estante: um por nível (o banco guarda o nível; a coluna não entra
-    na conta). Estante Parede: 6 seções × 6 níveis. A base do Nellore (nível 0) saiu dos endereços.
+    na conta). Estante Parede: 6 seções × 6 níveis. Ilha de paletes: um por espaço (12). A base do Nellore (nível 0) saiu dos endereços.
     O balcão não tem endereço.
     """
     k = item["kind"]
@@ -216,6 +233,9 @@ def montar(
             chave = ("g", cod, num, fc, an)
         elif tipo in ("galpao", "barracao"):
             continue
+        elif num == ILHA:
+            # Na ilha a posição é espaço + produto: a coluna separa os 5 produtos do mesmo espaço.
+            chave = ("e", cod, num, _clamp(an, 0, ESPACOS_ILHA - 1), _clamp(fc, 0, PRODUTOS_POR_ESPACO_ILHA - 1))
         else:
             chave = ("e", cod, num, _clamp(an, 0, niveis_produto(num) - 1))
         somas[chave] = somas.get(chave, 0.0) + q
@@ -241,6 +261,17 @@ def montar(
         if num in ESTANTES_REMOVIDAS or (num == NELLORE and int(r.get("nivel") or 0) == 0):
             continue
         niv = _clamp(int(r.get("nivel") or 0), 0, niveis_produto(num) - 1)
+        if num == ILHA:
+            col = _clamp(int(r.get("coluna") or 0), 0, PRODUTOS_POR_ESPACO_ILHA - 1)
+            if (cod, num, niv, col) in vistos:
+                continue
+            vistos.add((cod, num, niv, col))
+            # Endereço espaço-produto, como no app: 3-2 é o produto 2 do espaço 3.
+            por_item.setdefault(("estante", num), []).append(
+                {"c": cod, "n": r.get("produto_nome") or "", "loc": f"Espaço {niv + 1} · produto {col + 1}",
+                 "q": somas.get(("e", cod, num, niv, col)), "o": niv * 10 + col, "k": (num, niv)}
+            )
+            continue
         if (cod, num, niv) in vistos:
             continue
         vistos.add((cod, num, niv))
@@ -268,6 +299,7 @@ def montar(
         "loja": {"w": LOJA_W, "h": LOJA_H, "parede": PAREDE_ESP, "paredeH": PAREDE_H},
         "gondola": {"r": GONDOLA_R, "prat": [list(p) for p in GONDOLA_PRATELEIRAS], "escala": GONDOLA_ESCALA},
         "estanteH": ESTANTE_H,
+        "ilha": {"colunas": COLUNAS_ESPACOS_ILHA, "espacos": ESPACOS_ILHA},
         "alturaBoneco": ALTURA_GONDOLA,
         "itens": itens,
         "refs": [{"nome": n, "x": x, "z": z, "parede": p} for n, x, z, p in REFERENCIAS],
