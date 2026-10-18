@@ -7,8 +7,14 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 `lib/codigos_vinculados.dart`. Se a planta mudar lá, atualize `galpao.py`.
 
 - **Galpão:** 129 posições, pilhas de racks, cor por saldo (vermelho/azul), busca por número e produto.
+- **Rack misto:** o Gondolas deixa até 5 produtos no mesmo palete (o primeiro em `galpao_racks`, os outros em
+  `galpao_rack_itens`). Aqui o rack misto ganha duas faixas escuras, o cartão e a dica listam todos os produtos, e a
+  busca e a cor de saldo valem para qualquer um deles. Banco sem a tabela nova: o galpão segue só com os racks.
 - **Loja (gôndolas e estantes):** planta de 10 × 14 m com as 12 gôndolas, estantes de parede, EDR-300,
   expositores MagnoJet/Nellore/Monitor, Estante Parede, balcão e os bonecos que caminham pelos corredores.
+  No corredor central, entre a G7 e a G6, a **ilha de paletes**: 12 paletes com tapume verde (2 × 6, numerados de
+  1 a 12 do caixa para a entrada), 5 produtos por palete. No banco é a estante 22 (`nivel` = espaço, `coluna` =
+  produto); o cartão mostra `Espaço 3 · produto 2`. Digite `ilha` no campo Nº para ir até ela.
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
   Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
 - **Barracão:** a estrutura de 35 × 10 m (paredes de 6 m, porta, portão e porta na parede da frente) com os paletes
@@ -29,7 +35,7 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   recuo (0,60 m) estão em `galpao.py`.
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
   Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 44 × 4), Barracão (paletes com bag ÷ 100) e Loja
-  (faixas de endereço com produto ÷ 292: gôndola = 3 andares × 6 faces, estante = um por nível). O resumo do canto do
+  (faixas de endereço com produto ÷ 304: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço). O resumo do canto do
   galpão mostra a da parte aberta.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.

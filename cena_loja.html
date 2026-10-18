@@ -9,7 +9,7 @@
 <div id="wrap">
   <canvas id="gl"></canvas>
   <div id="top"><div class="row">
-    <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" placeholder="G7 ou E5" autocomplete="off"></div>
+    <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" placeholder="G7, E5 ou ilha" autocomplete="off"></div>
     <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
     <button class="btn" id="bVista" title="Voltar ao enquadramento inicial">⟲ Vista</button>
     <button class="btn" id="bBoneco" title="Quantos bonecos caminham pela loja">🚶 1</button>
@@ -19,6 +19,7 @@
   <div id="legend" class="panel">
     <span><i style="background:#4caf50"></i>Gôndola</span>
     <span><i style="background:#4a93d8"></i>Estante / expositor</span>
+    <span><i style="background:#2fbf5f"></i>Ilha de paletes</span>
     <span><i style="background:#1f9350"></i><i style="background:#8a6a52;margin-left:-4px"></i>Balcão</span>
     <span><i style="background:rgba(46,158,79,.55);border-color:#2e9e4f"></i>Produto buscado (marca no chão)</span>
     <span><i style="background:transparent;border:2px solid #e87722"></i>Selecionada</span>
@@ -35,7 +36,7 @@ const D = /*__DADOS__*/null;
 
 const ORANGE = 0xe87722, GREEN = 0x2e9e4f;
 // Cores reais do Gondolas: gôndola verde, estante azul, balcão verde-escuro com tampo de mármore marrom.
-const C_GOND = 0x4caf50, C_EST = 0x4a93d8, C_BALCAO = 0x1f9350, C_TAMPO = 0x8a6a52, C_PAREDE = 0xd2cdc2, C_FADE = 0xe9e6df;
+const C_GOND = 0x4caf50, C_EST = 0x4a93d8, C_ILHA = 0x2fbf5f, C_BALCAO = 0x1f9350, C_TAMPO = 0x8a6a52, C_PAREDE = 0xd2cdc2, C_FADE = 0xe9e6df;
 const state = { sel: null, matched: new Set(), bonecos: 1 };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 const $ = (id) => document.getElementById(id);
@@ -180,6 +181,28 @@ function montarBalcao(S, it) {
   S.h = h;
 }
 
+// Ilha de paletes: 12 placas baixas de tapume (2 × 6) com a fresta entre elas e o número do espaço
+// (1–12) pintado em cada uma — de 2 em 2, do caixa para a entrada, esquerda antes da direita.
+function montarIlha(S, it) {
+  const nc = D.ilha.colunas, nf = D.ilha.espacos / nc, h = 0.12, f = 0.03;
+  const pw = it.w / nc, pd = it.d / nf, x0 = it.x - it.w / 2, z0 = it.z - it.d / 2;
+  for (let e = 0; e < D.ilha.espacos; e++) {
+    const c = e % nc, r = Math.floor(e / nc);
+    const ax = x0 + c * pw, az = z0 + r * pd;
+    caixa(S, ax + f / 2, ax + pw - f / 2, 0, h, az + f / 2, az + pd - f / 2, "cor");
+    const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+    const g = cv.getContext("2d");
+    g.fillStyle = "rgba(11,38,20,.8)"; g.font = "bold 64px system-ui, Segoe UI, Arial, sans-serif";
+    g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(String(e + 1), 64, 68);
+    const t = new THREE.CanvasTexture(cv); t.anisotropy = 4;
+    const lado = Math.min(pw, pd) * 0.6;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(lado, lado), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set(ax + pw / 2, h + 0.003, az + pd / 2); m.renderOrder = 2;
+    S.group.add(m);
+  }
+  S.h = h;
+}
+
 const estruturas = [];                              // {it, S, hit, label, base}
 const labels = [];
 function makeLabelTex(txt, estilo) {
@@ -202,10 +225,11 @@ for (const it of D.itens) {
   else if (it.kind === "edr300") montarEstante(S, it, it.x, it.z, it.w, it.d, 6);
   else if (it.kind === "parede") montarParede(S, it);
   else if (it.kind === "balcao") montarBalcao(S, it);
+  else if (it.kind === "ilha") montarIlha(S, it);
   else if (["magnojet", "nellore", "monitor"].includes(it.kind)) montarExpositor(S, it);
   else montarEstante(S, it);
   scene.add(S.group);
-  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : C_EST;
+  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : it.kind === "ilha" ? C_ILHA : C_EST;
   // alvo do raio: caixa envolvente da estrutura (o balcão é só visual, como no app)
   let hit = null;
   if (it.kind !== "balcao") {
@@ -323,6 +347,7 @@ function mostrarInfo(e) {
   el.querySelector(".x").onclick = () => { state.sel = null; $("qNum").value = ""; selGrupo.visible = false; el.style.display = "none"; pintar(); };
 }
 function acharPorNumero(txt) {
+  if (/^\s*(ilha|paletes?|i)\s*$/i.test(txt)) { const e = estruturas.find((x) => x.it.kind === "ilha"); return e ? e.it.rot : null; }
   const m = /^\s*([ge])?\s*(\d{1,2})\s*$/i.exec(txt);
   if (!m) return null;
   const n = +m[2], letra = (m[1] || "").toLowerCase();
