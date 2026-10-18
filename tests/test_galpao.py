@@ -216,7 +216,7 @@ def test_indice_global_junta_os_tres_mapas():
 def test_ler_tudo_isola_o_mapa_que_falha(monkeypatch):
     import dados as ddg
     # galpão sem leitura (racks None) → só ele vira exemplo; os outros seguem
-    res = [None, None, None, None, None, None, [], [], [], [], []]
+    res = [None, None, None, None, None, None, [], [], [], [], [], None]
     monkeypatch.setattr(ddg, "consultar", lambda url, token, sqls: res)
     t = ddg.ler_tudo("http://x", "t")
     assert "galpao" in t["erros"] and "loja" not in t["erros"]
@@ -336,3 +336,46 @@ def test_mesa_na_ponta_da_rua_12_alem_do_119():
 def test_mesa_vai_no_json_do_galpao():
     import dados as ddm
     assert ddm.dados_exemplo()["mesa"]["gaveteiro"]["gavetas"] == 3
+
+
+# ── Rack misto (até 5 produtos no mesmo palete, no Gondolas) ───────────────
+
+
+def test_rack_misto_entra_no_rack_no_saldo_e_na_busca():
+    racks = [
+        {"posicao": 52, "ordem": 1, "produto_codigo": "A", "produto_nome": "PROD A", "quantidade": 10},
+        {"posicao": 52, "ordem": 2, "produto_codigo": "B", "produto_nome": "PROD B", "quantidade": 5},
+    ]
+    itens = [
+        {"posicao": 52, "ordem": 1, "produto_codigo": "X", "produto_nome": "", "quantidade": 3},
+        {"posicao": 52, "ordem": 1, "produto_codigo": "Y", "produto_nome": "PROD Y", "quantidade": 2},
+        {"posicao": 999, "ordem": 1, "produto_codigo": "Z", "produto_nome": "ORFAO", "quantidade": 1},
+    ]
+    mestre = [
+        {"codigo": "A", "produto": "PROD A", "qtd_sistema": 10},
+        {"codigo": "X", "produto": "PROD X DO MESTRE", "qtd_sistema": 9},
+        {"codigo": "Y", "produto": "PROD Y", "qtd_sistema": 2},
+    ]
+    end = [{"produto_codigo": c, "enderecado": q} for c, q in (("A", 10), ("B", 5), ("X", 3), ("Y", 2))]
+    out = dd.montar(racks, mestre, {}, end, itens)
+    base, cima = out["pilhas"]["52"]
+    assert [(i["c"], i["nome"], i["q"]) for i in base["it"]] == [("X", "PROD X DO MESTRE", 3.0), ("Y", "PROD Y", 2.0)]
+    assert "it" not in cima
+    # O item com falta entra na divergência como qualquer produto de rack.
+    assert out["divergencia"]["X"]["t"] == "falta" and "Y" not in out["divergencia"]
+    assert {c["c"] for c in out["catalogo"]} >= {"A", "B", "X", "Y"}
+    assert "Z" not in {c["c"] for c in out["catalogo"]}            # item de rack fora da leitura fica de fora
+    idx = dd.indice_global(out, {"itens": []}, {"pal": []})
+    assert {(i["c"], i["w"]) for i in idx} == {("A", "52"), ("B", "52"), ("X", "52"), ("Y", "52")}
+
+
+def test_sem_tabela_de_itens_o_galpao_segue_so_com_os_racks():
+    racks = [{"posicao": 52, "ordem": 1, "produto_codigo": "A", "produto_nome": "PROD A", "quantidade": 10}]
+    out = dd._montar_galpao_de(racks, None, [], None, None, [], None)
+    assert "it" not in out["pilhas"]["52"][0]
+
+
+def test_exemplo_tem_um_rack_misto():
+    d = dd.dados_exemplo()
+    mistos = [r for p in d["pilhas"].values() for r in p if r.get("it")]
+    assert len(mistos) == 1 and len(mistos[0]["it"]) == 2

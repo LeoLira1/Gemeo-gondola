@@ -54,6 +54,9 @@ const ruasDaParte = (p) => D.ruas.filter((r) => r.p === p);
 const normCod = (c) => (c || "").trim().toUpperCase();
 // Chave de casamento da busca: o estocado liga pelo NOME (o código EST: se repete entre cooperados)
 const chave = (c, nome, e) => (e ? "EST|" + nome : normCod(c));
+// Rack misto (até 5 produtos no mesmo palete): o principal e os extras (`it`), todos com {c, nome, q}.
+const produtosDo = (r) => [r, ...(r.it || [])];
+const rackAcha = (r) => produtosDo(r).some((p) => state.matched.has(chave(p.c, p.nome, p === r && r.e)));
 
 // ── Three.js ────────────────────────────────────────────────────────────────
 const canvas = $("gl");
@@ -89,6 +92,7 @@ const M = {
 const lineGris = new THREE.LineBasicMaterial({ color: 0x9a9892 });
 const lineFraca = new THREE.LineBasicMaterial({ color: 0xc9c5bb });
 const lineBorda = new THREE.LineBasicMaterial({ color: 0xcfcbc1, transparent: true, opacity: 0.9 });
+const listraMisto = new THREE.MeshBasicMaterial({ color: 0x2b2a27 });   // as duas faixas do rack misto
 
 const geoCache = {};
 function boxGeo(w, h, d) {
@@ -356,6 +360,15 @@ for (const p of D.posicoes) {
       m.userData = { n: p.n, o: r.o, rack: r };
       const borda = new THREE.LineSegments(edgesGeo(p.sx * 0.985, D.geo.alt, p.sz * 0.985), lineBorda);
       m.add(borda);
+      if (r.it && r.it.length) {
+        // Rack misto: duas faixas escuras em volta, a 1/3 e 2/3 da altura — distingue de longe sem tirar a cor.
+        for (const f of [-1 / 6, 1 / 6]) {
+          const faixa = new THREE.Mesh(boxGeo(p.sx * 0.985 + 0.012, 0.035, p.sz * 0.985 + 0.012), listraMisto);
+          faixa.position.y = f * D.geo.alt;
+          faixa.raycast = () => {};                 // o toque continua sendo do rack
+          m.add(faixa);
+        }
+      }
       stack.add(m);
       racks.push(m);
     }
@@ -497,10 +510,11 @@ scene.add(hoverBox);
 
 // ── Cores ───────────────────────────────────────────────────────────────────
 function materialDo(r) {
-  if (state.matched.size && state.matched.has(chave(r.c, r.nome, r.e))) return M.verde;     // busca > saldo
+  if (state.matched.size && rackAcha(r)) return M.verde;                               // busca > saldo
   if (r.e) return M.violeta;                                                          // estocado: fora do saldo
-  const d = D.divergencia[r.c];
-  if (d) return d.t === "falta" ? M.vermelho : M.azul;
+  // Rack misto: basta um produto divergente; falta ganha de sobra.
+  const ds = produtosDo(r).map((p) => D.divergencia[p.c]).filter(Boolean);
+  if (ds.length) return ds.some((d) => d.t === "falta") ? M.vermelho : M.azul;
   return M.branco;
 }
 function pintar() {
@@ -669,7 +683,7 @@ function montarChips() {
 function acertos() {
   const pos = [];
   if (state.matched.size) {
-    for (const c of casas.values()) if (c.racks.some((m) => state.matched.has(chave(m.userData.rack.c, m.userData.rack.nome, m.userData.rack.e)))) pos.push(c.p);
+    for (const c of casas.values()) if (c.racks.some((m) => rackAcha(m.userData.rack))) pos.push(c.p);
   }
   return pos;
 }
@@ -749,7 +763,8 @@ function mostrarInfo(c) {
   const el = $("info"), p = c.p;
   const pilha = pilhaDe(p.n);
   const linhas = pilha.length
-    ? [...pilha].reverse().map((r) => `<div class="lv"><span>N${r.o}</span><span style="text-align:right">${esc(r.nome || r.c)}<br><b>${fmt.format(r.q)} un</b></span></div>`).join("")
+    ? [...pilha].reverse().map((r) => `<div class="lv"><span>N${r.o}${r.it && r.it.length ? "<br><small>misto</small>" : ""}</span><span style="text-align:right">${
+        produtosDo(r).map((x) => `${esc(x.nome || x.c)}<br><b>${fmt.format(x.q)} un</b>`).join("<br>")}</span></div>`).join("")
     : `<div class="lv"><span></span><span>Vaga livre</span></div>`;
   el.innerHTML = `<button class="x" title="Fechar">×</button><h4>Posição ${p.n} · Rua ${p.r} · Parte ${p.p}</h4>${linhas}`;
   el.style.display = "block";
@@ -890,19 +905,22 @@ function verHover() {
     hoverBox.scale.set(cx.w + 0.06, cx.h + 0.06, cx.d + 0.06);
     hoverBox.position.set(cx.x, cx.h / 2, cx.z);
   } else if (ud.rack) {
-    const r = ud.rack;
+    const r = ud.rack, prods = produtosDo(r);
     t("b", `${ud.n} · N${ud.o}`);
-    tip.appendChild(document.createElement("br"));
-    t("span", r.nome || "(sem nome)");
-    tip.appendChild(document.createElement("br"));
-    t("span", `Cód. ${r.c}  `);
-    t("span", `${fmt.format(r.q)} un`, "q");
-    if (r.e) t("div", "Estocado (cooperado) · fora do saldo da loja", "s");
-    const d = D.divergencia[r.c];
-    if (d) {
-      const dif = Math.abs(d.end - d.sis);
-      t("div", d.t === "falta" ? `Faltam ${fmt.format(dif)} un por endereçar` : `${fmt.format(dif)} un endereçadas além do sistema`, d.t === "falta" ? "w" : "w az");
-      t("div", `Sistema ${fmt.format(d.sis)} · endereçado ${fmt.format(d.end)}` + (d.cods.length ? ` · ${d.cods.join(" + ")}` : ""), d.t === "falta" ? "w" : "w az");
+    if (prods.length > 1) t("div", `Rack misto · ${prods.length} produtos`, "s");
+    for (const x of prods) {
+      tip.appendChild(document.createElement("br"));
+      t("span", x.nome || "(sem nome)");
+      tip.appendChild(document.createElement("br"));
+      t("span", `Cód. ${x.c}  `);
+      t("span", `${fmt.format(x.q)} un`, "q");
+      if (x === r && r.e) t("div", "Estocado (cooperado) · fora do saldo da loja", "s");
+      const d = D.divergencia[x.c];
+      if (d) {
+        const dif = Math.abs(d.end - d.sis);
+        t("div", d.t === "falta" ? `Faltam ${fmt.format(dif)} un por endereçar` : `${fmt.format(dif)} un endereçadas além do sistema`, d.t === "falta" ? "w" : "w az");
+        t("div", `Sistema ${fmt.format(d.sis)} · endereçado ${fmt.format(d.end)}` + (d.cods.length ? ` · ${d.cods.join(" + ")}` : ""), d.t === "falta" ? "w" : "w az");
+      }
     }
     hoverBox.scale.set(c.p.sx * 0.995 + 0.04, D.geo.alt + 0.04, c.p.sz * 0.995 + 0.04);
     hoverBox.position.set(c.p.x, o.position.y, c.p.z);
