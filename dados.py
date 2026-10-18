@@ -23,6 +23,14 @@ SQL_RACKS = (
     "SELECT posicao, ordem, produto_codigo, produto_nome, quantidade "
     "FROM galpao_racks ORDER BY posicao, ordem"
 )
+# Rack misto (até 5 produtos no mesmo palete, no Gondolas): os produtos ALÉM do primeiro, com a posição
+# e o nível do rack que os leva. Consulta à parte: num banco sem a tabela ela volta None e o galpão
+# segue só com os racks.
+SQL_ITENS = (
+    "SELECT r.posicao, r.ordem, i.produto_codigo, i.produto_nome, i.quantidade "
+    "FROM galpao_rack_itens i JOIN galpao_racks r ON r.rack_uuid = i.rack_uuid "
+    "ORDER BY r.posicao, r.ordem, i.id"
+)
 SQL_POSICOES = "SELECT numero, pos_x, pos_z FROM galpao_posicoes"
 SQL_MESTRE = "SELECT codigo, produto, qtd_sistema FROM estoque_mestre LIMIT 5000"
 SQL_MAPA = "SELECT produto_id, codigo FROM mapa_produtos WHERE codigo IS NOT NULL"
@@ -103,8 +111,13 @@ def montar(
     mestre: list[dict[str, Any]],
     vinculos: dict[str, str],
     enderecado_rows: list[dict[str, Any]],
+    itens: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Cruza as leituras e devolve o JSON da cena (sem segredo nenhum)."""
+    """Cruza as leituras e devolve o JSON da cena (sem segredo nenhum).
+
+    `itens` são os produtos extras dos racks mistos: entram no rack como `it` (lista de
+    {c, nome, q}), e contam para saldo, nome e busca como qualquer produto de rack.
+    """
     pilhas: dict[int, list[dict[str, Any]]] = {}
     for r in racks:
         pos = r.get("posicao")
@@ -118,6 +131,15 @@ def montar(
                 "q": _num(r.get("quantidade")),
                 "e": es.codigo_eh_estocado(r.get("produto_codigo")),
             }
+        )
+
+    por_nivel = {(pos, r["o"]): r for pos, pilha in pilhas.items() for r in pilha}
+    for i in itens or []:
+        rack = por_nivel.get((i.get("posicao"), int(i.get("ordem") or 1)))
+        if rack is None:  # item de rack que não está na leitura (órfão, fora da planta)
+            continue
+        rack.setdefault("it", []).append(
+            {"c": i.get("produto_codigo") or "", "nome": i.get("produto_nome") or "", "q": _num(i.get("quantidade"))}
         )
 
     sistema: dict[str, float] = {}
@@ -137,6 +159,7 @@ def montar(
 
     # "EST:" (material de cooperado) fica FORA do saldo: não entra em grupos, saldos nem divergência.
     codigos_com_rack = {r["c"] for pilha in pilhas.values() for r in pilha if r["c"].strip() and not r["e"]}
+    codigos_com_rack |= {i["c"] for r in _racks(pilhas) for i in r.get("it", []) if i["c"].strip()}
     grupos = g.grupos_de_codigos(codigos_com_rack, vinculos, nome_mestre)
     saldos = g.montar_saldos(codigos_com_rack, grupos, sistema, enderecado)
 
@@ -155,10 +178,15 @@ def montar(
             catalogo.setdefault(r["c"], nome)
             if not r["nome"]:
                 r["nome"] = nome
+    for i in (i for r in _racks(pilhas) for i in r.get("it", [])):
+        if i["c"].strip():
+            catalogo.setdefault(i["c"], nome_mestre.get(g.normalizar_codigo(i["c"]) or "") or i["nome"])
     for pilha in pilhas.values():
         for r in pilha:
             if not r["e"]:
                 r["nome"] = catalogo.get(r["c"], r["nome"])
+            for i in r.get("it", []):
+                i["nome"] = catalogo.get(i["c"], i["nome"])
 
     divergencia = {
         cod: {
@@ -204,7 +232,11 @@ def montar(
     }
 
 
-def _montar_galpao_de(racks, posicoes, mestre, mapa, mapa_cod, end) -> dict[str, Any]:
+def _racks(pilhas: dict[Any, list[dict[str, Any]]]):
+    return (r for pilha in pilhas.values() for r in pilha)
+
+
+def _montar_galpao_de(racks, posicoes, mestre, mapa, mapa_cod, end, itens=None) -> dict[str, Any]:
     if racks is None or mestre is None or end is None:
         raise TursoErro("não consegui ler galpao_racks / estoque_mestre / estoque_localizado")
 
@@ -216,14 +248,14 @@ def _montar_galpao_de(racks, posicoes, mestre, mapa, mapa_cod, end) -> dict[str,
             if c and pid:
                 vinculos[c] = pid
 
-    dados = montar(racks, mestre, vinculos, end)
+    dados = montar(racks, mestre, vinculos, end, itens)
     dados["avisos"] = _avisos_planta(posicoes)
     return dados
 
 
 def ler_turso(url: str, token: str) -> dict[str, Any]:
     return _montar_galpao_de(
-        *consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO])
+        *consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO, SQL_ITENS])
     )
 
 
@@ -295,8 +327,13 @@ def dados_exemplo() -> dict[str, Any]:
                  "produto_nome": nome, "quantidade": rnd.choice([20, 24, 30, 40, 48, 60, 90])}
             )
     _estocados_demo_racks(racks)
+    # Um rack misto: o primeiro rack de loja ganha mais dois produtos no mesmo palete.
+    base = next(r for r in racks if not es.codigo_eh_estocado(r["produto_codigo"]))
+    outros = [c for c in _PRODUTOS_DEMO if c[0] in ("300245", "410078") and c[0] != base["produto_codigo"]][:2]
+    itens = [{"posicao": base["posicao"], "ordem": base["ordem"], "produto_codigo": c, "produto_nome": n,
+              "quantidade": q} for (c, n), q in zip(outros, (6, 4))]
     totais: dict[str, float] = {}
-    for r in racks:
+    for r in [*racks, *itens]:
         if es.codigo_eh_estocado(r["produto_codigo"]):
             continue  # fora do saldo
         totais[r["produto_codigo"]] = totais.get(r["produto_codigo"], 0) + r["quantidade"]
@@ -314,7 +351,7 @@ def dados_exemplo() -> dict[str, Any]:
             continue
         mestre.append({"codigo": cod, "produto": nome, "qtd_sistema": round(end * fator)})
     enderecado = [{"produto_codigo": c, "enderecado": q} for c, q in totais.items()]
-    dados = montar(racks, mestre, {}, enderecado)
+    dados = montar(racks, mestre, {}, enderecado, itens)
     dados["avisos"] = []
     return dados
 
@@ -326,7 +363,7 @@ SQL_GONDOLAS = (
     "FROM gondola_layout ORDER BY produto_nome"
 )
 SQL_ESTANTES = (
-    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel FROM estante_layout "
+    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel, coluna FROM estante_layout "
     f"WHERE estante_num NOT IN ({', '.join(map(str, lj.ESTANTES_REMOVIDAS))}) "
     f"AND NOT (estante_num = {lj.NELLORE} AND nivel = 0) ORDER BY produto_nome"
 )
@@ -365,9 +402,11 @@ def loja_exemplo() -> dict[str, Any]:
             else:
                 nivel = rnd.randint(0, lj.niveis_produto(it["n"]) - 1)
                 num = it["n"] + (rnd.randint(0, 5) if it["kind"] == "parede" else 0)
-                est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel})
+                col = rnd.randint(0, lj.PRODUTOS_POR_ESPACO_ILHA - 1) if it["kind"] == "ilha" else 0
+                est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel,
+                            "coluna": col})
                 qtd.append({"produto_codigo": cod, "local_tipo": "estante", "local_num": num,
-                            "face_ou_coluna": 0, "andar_ou_nivel": nivel, "quantidade": q})
+                            "face_ou_coluna": col, "andar_ou_nivel": nivel, "quantidade": q})
     dados = lj.montar(gond, est, qtd)
     dados["avisos"] = []
     return dados
@@ -414,8 +453,9 @@ def indice_global(galpao: dict[str, Any], loja: dict[str, Any], barracao: dict[s
     out: list[dict[str, Any]] = []
     for pos, pilha in galpao["pilhas"].items():
         for r in pilha:
-            if r["c"].strip():
-                out.append({"c": r["c"], "n": r["nome"], "a": "galpao", "w": pos})
+            for p in [r, *r.get("it", [])]:
+                if p["c"].strip():
+                    out.append({"c": p["c"], "n": p["nome"], "a": "galpao", "w": pos})
     for it in loja["itens"]:
         for p in it["prod"]:
             if p["c"].strip():
@@ -442,13 +482,13 @@ def ler_tudo(url: str, token: str) -> dict[str, Any]:
     """Galpão, loja e barracão numa ida só ao Turso. Um mapa que falha vira dados de exemplo
     (anotado em `erros`), sem derrubar os outros."""
     res = consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO,
-                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO, es.SQL_ESTOCADOS])
+                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO, es.SQL_ESTOCADOS, SQL_ITENS])
     erros: dict[str, str] = {}
     try:
-        galpao = _montar_galpao_de(*res[:6])
+        galpao = _montar_galpao_de(*res[:6], itens=res[11])
     except TursoErro as e:
         galpao, erros["galpao"] = dados_exemplo(), str(e)
-    gond, est, qtd, barr, terc = res[6:]
+    gond, est, qtd, barr, terc = res[6:11]
     if gond is None or est is None:
         loja, erros["loja"] = loja_exemplo(), "não consegui ler gondola_layout / estante_layout"
     else:
