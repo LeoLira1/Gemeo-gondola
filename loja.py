@@ -36,6 +36,10 @@ ILHA = 22
 ESPACOS_ILHA = 12
 COLUNAS_ESPACOS_ILHA = 2
 PRODUTOS_POR_ESPACO_ILHA = 5
+# Mostruário: palete de madeira (1,20 × 1,00 m) na parede da direita, entre a E1 e a cozinha, com ~20 tipos
+# de ferragem e ferramenta. No banco é a estante 23 com nivel = posição (0–19) e coluna sempre 0.
+MOSTRUARIO = 23
+POSICOES_MOSTRUARIO = 20
 
 GONDOLA_R = 0.62
 # (raio, y do centro, altura) de cada prateleira da gôndola, na escala da cena de detalhe
@@ -64,6 +68,8 @@ _ESTRUTURAS = (
     (BALCAO, 1.45, _BALCAO_Z, 0.60, 7.95),
     # Medida de mapa, não a real (2,40 × 6,00 m): na planta simplificada a ilha real encostaria nas gôndolas.
     (ILHA, 5.0, 8.0, 1.8, 5.6),
+    # Medida real, com o lado de 1,20 m ao longo da parede; o corredor do cliente (x = 8,4) passa pela frente.
+    (MOSTRUARIO, 9.27, 6.2, 1.0, 1.2),
 )
 
 REFERENCIAS = (
@@ -97,6 +103,8 @@ def _kind(numero: int) -> str:
         return "balcao"
     if numero == ILHA:
         return "ilha"
+    if numero == MOSTRUARIO:
+        return "mostruario"
     if PAREDE_MIN <= numero <= PAREDE_MAX:
         return "parede"
     return "estante"
@@ -126,6 +134,8 @@ def rotulo_curto(item: dict[str, Any]) -> str:
         return "E13–18"
     if item["kind"] == "ilha":
         return "Ilha"
+    if item["kind"] == "mostruario":
+        return "Mostruário"
     return ("G" if item["tipo"] == "gondola" else "E") + str(item["n"])
 
 
@@ -143,6 +153,8 @@ def nome_estrutura(item: dict[str, Any]) -> str:
         return "Expositor Monitor (E20)"
     if k == "ilha":
         return "Ilha de paletes (12 espaços × 5 produtos)"
+    if k == "mostruario":
+        return "Mostruário de ferragens (20 posições)"
     return ("Gôndola " if item["tipo"] == "gondola" else "Estante ") + str(item["n"])
 
 
@@ -166,6 +178,8 @@ def niveis_produto(numero: int) -> int:
         return 3
     if numero == ILHA:
         return ESPACOS_ILHA
+    if numero == MOSTRUARIO:
+        return POSICOES_MOSTRUARIO
     if numero in (EDR300, EDR300_TRIPLA):
         return 6
     if numero == MAGNOJET:
@@ -188,7 +202,7 @@ def faixas(item: dict[str, Any]) -> int:
     """Quantas "vagas" de endereço a estrutura tem, para a capacidade da loja.
 
     Gôndola: 3 andares × 6 faces = 18. Estante: um por nível (o banco guarda o nível; a coluna não entra
-    na conta). Estante Parede: 6 seções × 6 níveis. Ilha de paletes: um por espaço (12). A base do Nellore (nível 0) saiu dos endereços.
+    na conta). Estante Parede: 6 seções × 6 níveis. Ilha de paletes: um por espaço (12). Mostruário: um por posição (20). A base do Nellore (nível 0) saiu dos endereços.
     O balcão não tem endereço.
     """
     k = item["kind"]
@@ -276,7 +290,12 @@ def montar(
             continue
         vistos.add((cod, num, niv))
         no_mapa = numero_no_mapa("estante", num)
-        loc = f"Nível {niv + 1}" if no_mapa == num else f"Seção {num} · Nível {niv + 1}"
+        if num == MOSTRUARIO:
+            loc = f"Posição {niv + 1}"                            # o nível é a posição 1–20 no tampo
+        elif no_mapa == num:
+            loc = f"Nível {niv + 1}"
+        else:
+            loc = f"Seção {num} · Nível {niv + 1}"
         por_item.setdefault(("estante", no_mapa), []).append(
             {"c": cod, "n": r.get("produto_nome") or "", "loc": loc,
              "q": somas.get(("e", cod, num, niv)), "o": num * 10 + niv, "k": (num, niv)}
