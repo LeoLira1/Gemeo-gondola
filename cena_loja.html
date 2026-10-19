@@ -9,7 +9,7 @@
 <div id="wrap">
   <canvas id="gl"></canvas>
   <div id="top"><div class="row">
-    <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" placeholder="G7, E5 ou ilha" autocomplete="off"></div>
+    <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" placeholder="G7, E5, ilha ou mostruário" autocomplete="off"></div>
     <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
     <button class="btn" id="bVista" title="Voltar ao enquadramento inicial">⟲ Vista</button>
     <button class="btn" id="bBoneco" title="Quantos bonecos caminham pela loja">🚶 1</button>
@@ -20,6 +20,7 @@
     <span><i style="background:#4caf50"></i>Gôndola</span>
     <span><i style="background:#4a93d8"></i>Estante / expositor</span>
     <span><i style="background:#2fbf5f"></i>Ilha de paletes</span>
+    <span><i style="background:#8a6a42"></i>Mostruário (palete)</span>
     <span><i style="background:#1f9350"></i><i style="background:#8a6a52;margin-left:-4px"></i>Balcão</span>
     <span><i style="background:rgba(46,158,79,.55);border-color:#2e9e4f"></i>Produto buscado (marca no chão)</span>
     <span><i style="background:transparent;border:2px solid #e87722"></i>Selecionada</span>
@@ -36,7 +37,7 @@ const D = /*__DADOS__*/null;
 
 const ORANGE = 0xe87722, GREEN = 0x2e9e4f;
 // Cores reais do Gondolas: gôndola verde, estante azul, balcão verde-escuro com tampo de mármore marrom.
-const C_GOND = 0x4caf50, C_EST = 0x4a93d8, C_ILHA = 0x2fbf5f, C_BALCAO = 0x1f9350, C_TAMPO = 0x8a6a52, C_PAREDE = 0xd2cdc2, C_FADE = 0xe9e6df;
+const C_GOND = 0x4caf50, C_EST = 0x4a93d8, C_ILHA = 0x2fbf5f, C_MADEIRA = 0x8a6a42, C_BALCAO = 0x1f9350, C_TAMPO = 0x8a6a52, C_PAREDE = 0xd2cdc2, C_FADE = 0xe9e6df;
 const state = { sel: null, matched: new Set(), bonecos: 1 };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 const $ = (id) => document.getElementById(id);
@@ -203,6 +204,16 @@ function montarIlha(S, it) {
   S.h = h;
 }
 
+// Mostruário: palete de madeira baixo (PBR, 0,144 m) — três travessas escuras embaixo e o tampo em
+// 5 tábuas correndo ao longo da parede (Z), com fresta entre elas.
+function montarMostruario(S, it) {
+  const h = 0.144, tabua = 0.022, x0 = it.x - it.w / 2, z0 = it.z - it.d / 2, z1 = it.z + it.d / 2;
+  for (const c of [0.05, it.w / 2, it.w - 0.05]) caixa(S, x0 + c - 0.05, x0 + c + 0.05, 0, h - tabua, z0, z1, "poste");
+  const n = 5, f = 0.015, w = (it.w - f * (n - 1)) / n;
+  for (let i = 0; i < n; i++) { const a = x0 + i * (w + f); caixa(S, a, a + w, h - tabua, h, z0, z1, "cor"); }
+  S.h = h;
+}
+
 const estruturas = [];                              // {it, S, hit, label, base}
 const labels = [];
 function makeLabelTex(txt, estilo) {
@@ -213,7 +224,10 @@ function makeLabelTex(txt, estilo) {
     const cores = { n: ["rgba(255,255,255,.93)", "#2b2a27", "#d4d0c6"], h: ["#2e9e4f", "#fff", "#2e9e4f"], s: ["#e87722", "#fff", "#e87722"] }[estilo];
     g.fillStyle = cores[0]; g.strokeStyle = cores[2]; g.lineWidth = 3;
     g.beginPath(); g.roundRect ? g.roundRect(6, 8, 180, 64, 22) : g.rect(6, 8, 180, 64); g.fill(); g.stroke();
-    g.fillStyle = cores[1]; g.font = "bold 40px system-ui, Segoe UI, Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillStyle = cores[1]; g.font = "bold 40px system-ui, Segoe UI, Arial, sans-serif";
+    const larg = g.measureText(txt).width;              // "Mostruário" não cabe em 40px: encolhe até caber
+    if (larg > 160) g.font = `bold ${Math.floor(40 * 160 / larg)}px system-ui, Segoe UI, Arial, sans-serif`;
+    g.textAlign = "center"; g.textBaseline = "middle";
     g.fillText(txt, 96, 42);
     const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
   })();
@@ -226,10 +240,11 @@ for (const it of D.itens) {
   else if (it.kind === "parede") montarParede(S, it);
   else if (it.kind === "balcao") montarBalcao(S, it);
   else if (it.kind === "ilha") montarIlha(S, it);
+  else if (it.kind === "mostruario") montarMostruario(S, it);
   else if (["magnojet", "nellore", "monitor"].includes(it.kind)) montarExpositor(S, it);
   else montarEstante(S, it);
   scene.add(S.group);
-  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : it.kind === "ilha" ? C_ILHA : C_EST;
+  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : it.kind === "ilha" ? C_ILHA : it.kind === "mostruario" ? C_MADEIRA : C_EST;
   // alvo do raio: caixa envolvente da estrutura (o balcão é só visual, como no app)
   let hit = null;
   if (it.kind !== "balcao") {
@@ -348,6 +363,7 @@ function mostrarInfo(e) {
 }
 function acharPorNumero(txt) {
   if (/^\s*(ilha|paletes?|i)\s*$/i.test(txt)) { const e = estruturas.find((x) => x.it.kind === "ilha"); return e ? e.it.rot : null; }
+  if (/^\s*(mostru[aá]rio|most|m)\s*$/i.test(txt)) { const e = estruturas.find((x) => x.it.kind === "mostruario"); return e ? e.it.rot : null; }
   const m = /^\s*([ge])?\s*(\d{1,2})\s*$/i.exec(txt);
   if (!m) return null;
   const n = +m[2], letra = (m[1] || "").toLowerCase();

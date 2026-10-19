@@ -15,6 +15,8 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   No corredor central, entre a G7 e a G6, a **ilha de paletes**: 12 paletes com tapume verde (2 × 6, numerados de
   1 a 12 do caixa para a entrada), 5 produtos por palete. No banco é a estante 22 (`nivel` = espaço, `coluna` =
   produto); o cartão mostra `Espaço 3 · produto 2`. Digite `ilha` no campo Nº para ir até ela.
+  Na parede da direita, entre a E1 e a cozinha, o **mostruário**: um palete de madeira com ~20 tipos de ferragem e
+  ferramenta (estante 23, `nivel` = posição 0–19); o cartão mostra `Posição 7`. Digite `mostruário` (ou `E23`) no campo Nº.
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
   Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
 - **Barracão:** a estrutura de 35 × 10 m (paredes de 6 m, porta, portão e porta na parede da frente) com os paletes
@@ -35,7 +37,7 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   recuo (0,60 m) estão em `galpao.py`.
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
   Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 44 × 4), Barracão (paletes com bag ÷ 100) e Loja
-  (faixas de endereço com produto ÷ 304: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço). O resumo do canto do
+  (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do
   galpão mostra a da parte aberta.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token
   nunca vai para o navegador.
