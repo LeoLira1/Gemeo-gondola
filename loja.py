@@ -228,6 +228,30 @@ def _num(v: Any) -> float:
         return 0.0
 
 
+_HEX = set("0123456789abcdefABCDEF")
+
+
+def cor_caixa(v: Any) -> str:
+    """cor_hex do layout ('#RRGGBB'); sem cor válida, o cinza que o app usa para produto sem categoria."""
+    s = str(v or "").strip()
+    return s if len(s) == 7 and s[0] == "#" and set(s[1:]) <= _HEX else "#888888"
+
+
+def caixas_gondola(r: dict[str, Any]) -> dict[str, Any]:
+    """Uma caixa da gôndola: andar e pos_x/pos_z como o app grava (escala da cena de detalhe, raio até 3,4)."""
+    return {"c": r.get("produto_codigo") or "", "h": cor_caixa(r.get("cor_hex")),
+            "a": _clamp(int(r.get("andar") or 0), 0, 2), "x": round(_num(r.get("pos_x")), 3),
+            "z": round(_num(r.get("pos_z")), 3)}
+
+
+def caixas_estante(r: dict[str, Any]) -> dict[str, Any]:
+    """Uma caixa da estante: número (seção, na Estante Parede), coluna, nível e slot como o app grava."""
+    num = int(r.get("estante_num") or 0)
+    return {"c": r.get("produto_codigo") or "", "h": cor_caixa(r.get("cor_hex")), "e": num,
+            "col": max(0, int(r.get("coluna") or 0)), "niv": _clamp(int(r.get("nivel") or 0), 0, niveis_produto(num) - 1),
+            "s": max(0, int(r.get("slot") or 0))}
+
+
 def montar(
     gondolas: list[dict[str, Any]],
     estantes: list[dict[str, Any]],
@@ -255,10 +279,13 @@ def montar(
         somas[chave] = somas.get(chave, 0.0) + q
 
     por_item: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    # Caixas físicas, uma por linha do layout (o mesmo produto pode ter várias caixas na mesma faixa).
+    caixas: dict[tuple[str, int], list[dict[str, Any]]] = {}
     vistos: set = set()
     for r in gondolas:
         cod = r.get("produto_codigo") or ""
         num = int(r.get("gondola_num") or 0)
+        caixas.setdefault(("gondola", num), []).append(caixas_gondola(r))
         a = _clamp(int(r.get("andar") or 0), 0, 2)
         face = face_from_pos(_num(r.get("pos_x")), _num(r.get("pos_z")))
         if (cod, num, a, face) in vistos:
@@ -274,6 +301,7 @@ def montar(
         num = int(r.get("estante_num") or 0)
         if num in ESTANTES_REMOVIDAS or (num == NELLORE and int(r.get("nivel") or 0) == 0):
             continue
+        caixas.setdefault(("estante", numero_no_mapa("estante", num)), []).append(caixas_estante(r))
         niv = _clamp(int(r.get("nivel") or 0), 0, niveis_produto(num) - 1)
         if num == ILHA:
             col = _clamp(int(r.get("coluna") or 0), 0, PRODUTOS_POR_ESPACO_ILHA - 1)
@@ -312,6 +340,7 @@ def montar(
             if p["c"].strip():
                 catalogo.setdefault(p["c"], p["n"])
         itens.append({**it, "rot": rotulo_curto(it), "nome": nome_estrutura(it), "prod": prods,
+                      "cx": caixas.get((it["tipo"], it["n"]), []),
                       "faixas": faixas(it), "ocupadas": min(ocupadas, faixas(it))})
 
     return {
