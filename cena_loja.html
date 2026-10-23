@@ -214,6 +214,18 @@ function montarMostruario(S, it) {
   S.h = h;
 }
 
+// Expositor de Madeira: 3 degraus maciços encostados no balcão (x baixo), descendo para o corredor (+X),
+// com um tampo mais claro em cada piso.
+function montarMadeira(S, it) {
+  const h = 0.45, n = 3, tT = 0.02, x0 = it.x - it.w / 2, z0 = it.z - it.d / 2, z1 = it.z + it.d / 2;
+  for (let k = 0; k < n; k++) {
+    const xf = x0 + (it.w * (n - k)) / n, y0 = (h * k) / n, y1 = (h * (k + 1)) / n;
+    caixa(S, x0, xf, y0, y1 - tT, z0, z1, "cor");
+    caixa(S, x0, xf, y1 - tT, y1, z0, z1, "test");          // "test" = a cor base clareada
+  }
+  S.h = h;
+}
+
 const estruturas = [];                              // {it, S, hit, label, base}
 const labels = [];
 function makeLabelTex(txt, estilo) {
@@ -241,10 +253,11 @@ for (const it of D.itens) {
   else if (it.kind === "balcao") montarBalcao(S, it);
   else if (it.kind === "ilha") montarIlha(S, it);
   else if (it.kind === "mostruario") montarMostruario(S, it);
+  else if (it.kind === "madeira") montarMadeira(S, it);
   else if (["magnojet", "nellore", "monitor"].includes(it.kind)) montarExpositor(S, it);
   else montarEstante(S, it);
   scene.add(S.group);
-  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : it.kind === "ilha" ? C_ILHA : it.kind === "mostruario" ? C_MADEIRA : C_EST;
+  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : it.kind === "ilha" ? C_ILHA : it.kind === "mostruario" || it.kind === "madeira" ? C_MADEIRA : C_EST;
   // alvo do raio: caixa envolvente da estrutura (o balcão é só visual, como no app)
   let hit = null;
   if (it.kind !== "balcao") {
