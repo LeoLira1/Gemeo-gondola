@@ -216,6 +216,18 @@ function montarMostruario(S, it) {
   S.h = h;
 }
 
+// Expositor de Madeira: 3 degraus maciços encostados no balcão (x baixo), descendo para o corredor (+X),
+// com um tampo mais claro em cada piso.
+function montarMadeira(S, it) {
+  const h = 0.45, n = 3, tT = 0.02, x0 = it.x - it.w / 2, z0 = it.z - it.d / 2, z1 = it.z + it.d / 2;
+  for (let k = 0; k < n; k++) {
+    const xf = x0 + (it.w * (n - k)) / n, y0 = (h * k) / n, y1 = (h * (k + 1)) / n;
+    caixa(S, x0, xf, y0, y1 - tT, z0, z1, "cor");
+    caixa(S, x0, xf, y1 - tT, y1, z0, z1, "test");          // "test" = a cor base clareada
+  }
+  S.h = h;
+}
+
 const estruturas = [];                              // {it, S, hit, label, base}
 const labels = [];
 function makeLabelTex(txt, estilo) {
@@ -243,10 +255,11 @@ for (const it of D.itens) {
   else if (it.kind === "balcao") montarBalcao(S, it);
   else if (it.kind === "ilha") montarIlha(S, it);
   else if (it.kind === "mostruario") montarMostruario(S, it);
+  else if (it.kind === "madeira") montarMadeira(S, it);
   else if (["magnojet", "nellore", "monitor"].includes(it.kind)) montarExpositor(S, it);
   else montarEstante(S, it);
   scene.add(S.group);
-  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : it.kind === "ilha" ? C_ILHA : it.kind === "mostruario" ? C_MADEIRA : C_EST;
+  const base = it.kind === "gondola" ? C_GOND : it.kind === "balcao" ? C_BALCAO : it.kind === "ilha" ? C_ILHA : it.kind === "mostruario" || it.kind === "madeira" ? C_MADEIRA : C_EST;
   // alvo do raio: caixa envolvente da estrutura (o balcão é só visual, como no app)
   let hit = null;
   if (it.kind !== "balcao") {
@@ -303,6 +316,11 @@ function vagaCaixa(it, k, maxCol, maxSlot) {
     const c = k.niv % nc, r = Math.floor(k.niv / nc), p = Math.min(k.col, 4), fila = p < 3 ? 0 : 1, nf = fila ? 2 : 3;
     const b = Math.min(pw, pd) * 0.26;
     return { x: it.x - it.w / 2 + c * pw + pw * ((fila ? p - 3 : p) + 0.5) / nf, y: 0.12, z: it.z - it.d / 2 + r * pd + pd * (fila ? 0.7 : 0.3), w: b, h: b * 0.9, d: b };
+  }
+  if (it.kind === "madeira") {                      // degrau = nível (0 = o de baixo, na frente), 6 produtos ao longo do balcão
+    const n = 3, niv = Math.min(k.niv, n - 1), piso = it.w / n, cel = it.d / 6;
+    return { x: it.x - it.w / 2 + piso * (n - 1 - niv + 0.5), y: (0.45 * (niv + 1)) / n, z: it.z - it.d / 2 + cel * (Math.min(k.col, 5) + 0.5),
+             w: piso * 0.75, h: 0.10, d: cel * 0.75 };
   }
   if (it.kind === "mostruario") {                   // 20 posições no tampo: 4 ao longo da parede × 5
     const p = Math.min(k.niv, 19), cz = p % 4, cx = Math.floor(p / 4), b = 0.14;
