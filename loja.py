@@ -40,6 +40,11 @@ PRODUTOS_POR_ESPACO_ILHA = 5
 # de ferragem e ferramenta. No banco é a estante 23 com nivel = posição (0–19) e coluna sempre 0.
 MOSTRUARIO = 23
 POSICOES_MOSTRUARIO = 20
+# Expositor de Madeira: escada maciça de 3 degraus (1 m × 1 m) encostada no balcão pelo lado do corredor, 6 produtos
+# por degrau. No banco é a estante 24 com nivel = degrau (0 = de baixo) e coluna = produto (0–5), letras A–F no degrau
+# de cima, G–L no do meio e M–R no de baixo.
+MADEIRA = 24
+DEGRAUS_MADEIRA = ("de baixo", "do meio", "de cima")
 
 GONDOLA_R = 0.62
 # (raio, y do centro, altura) de cada prateleira da gôndola, na escala da cena de detalhe
@@ -70,6 +75,8 @@ _ESTRUTURAS = (
     (ILHA, 5.0, 8.0, 1.8, 5.6),
     # Medida real, com o lado de 1,20 m ao longo da parede; o corredor do cliente (x = 8,4) passa pela frente.
     (MOSTRUARIO, 9.27, 6.2, 1.0, 1.2),
+    # Colado no balcão (borda em x = 1,75), no vão entre a G9 (z = 10) e a G8 (z = 12); 0,40 m de fundo × 1 m.
+    (MADEIRA, 1.45 + 0.30 + 0.20, 11.0, 0.40, 1.0),
 )
 
 REFERENCIAS = (
@@ -81,10 +88,12 @@ REFERENCIAS = (
 )
 
 # Rotas dos bonecos (rotasLoja): funcionário e cliente, só pelos corredores. O funcionário
-# dá a volta na ilha de paletes, entre ela e as colunas de gôndolas.
+# dá a volta na ilha de paletes, entre ela e as colunas de gôndolas. O cliente desvia do Expositor de Madeira
+# por x = 2,38, no vão entre a G9 e a G8.
 ROTAS = (
     ((3.86, 4.91), (3.86, 12.85), (6.14, 12.85), (6.14, 4.91)),
-    ((8.4, 2.80), (8.4, 13.30), (2.05, 13.30), (2.05, 2.80)),
+    ((8.4, 2.80), (8.4, 13.30), (2.05, 13.30), (2.05, 11.90), (2.38, 11.50), (2.38, 10.50), (2.05, 10.10),
+     (2.05, 2.80)),
 )
 
 
@@ -105,6 +114,8 @@ def _kind(numero: int) -> str:
         return "ilha"
     if numero == MOSTRUARIO:
         return "mostruario"
+    if numero == MADEIRA:
+        return "madeira"
     if PAREDE_MIN <= numero <= PAREDE_MAX:
         return "parede"
     return "estante"
@@ -155,6 +166,8 @@ def nome_estrutura(item: dict[str, Any]) -> str:
         return "Ilha de paletes (12 espaços × 5 produtos)"
     if k == "mostruario":
         return "Mostruário de ferragens (20 posições)"
+    if k == "madeira":
+        return "Expositor de Madeira (E24 · 3 degraus × 6)"
     return ("Gôndola " if item["tipo"] == "gondola" else "Estante ") + str(item["n"])
 
 
@@ -188,6 +201,8 @@ def niveis_produto(numero: int) -> int:
         return 6
     if numero == MONITOR:
         return 4
+    if numero == MADEIRA:
+        return len(DEGRAUS_MADEIRA)
     if PAREDE_MIN <= numero <= PAREDE_MAX:
         return 6
     if numero in (3, 4):
@@ -320,6 +335,8 @@ def montar(
         no_mapa = numero_no_mapa("estante", num)
         if num == MOSTRUARIO:
             loc = f"Posição {niv + 1}"                            # o nível é a posição 1–20 no tampo
+        elif num == MADEIRA:
+            loc = f"Degrau {DEGRAUS_MADEIRA[niv]}"
         elif no_mapa == num:
             loc = f"Nível {niv + 1}"
         else:

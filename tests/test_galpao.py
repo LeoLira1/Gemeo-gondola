@@ -103,7 +103,7 @@ import loja as lj
 def test_planta_da_loja():
     gond = [i for i in lj.ITENS if i["tipo"] == "gondola"]
     assert sorted(i["n"] for i in gond) == list(range(1, 13))
-    assert {i["n"] for i in lj.ITENS if i["tipo"] == "estante"} == {1, 2, 6, 7, 8, 9, 13, 19, 20, 21, 22, 23}
+    assert {i["n"] for i in lj.ITENS if i["tipo"] == "estante"} == {1, 2, 6, 7, 8, 9, 13, 19, 20, 21, 22, 23, 24}
     # tudo dentro das paredes
     tol = 0.01   # a Estante Parede do Gondolas entra 5 mm na parede (x = 0,45, w = 0,55)
     for i in lj.ITENS:
@@ -165,6 +165,23 @@ def test_mostruario():
     assert [(p["loc"], p["q"]) for p in it["prod"]] == [("Posição 7", 50), ("Posição 20", 3)]
 
 
+def test_expositor_de_madeira():
+    m = next(i for i in lj.ITENS if i["kind"] == "madeira")
+    assert m["n"] == lj.MADEIRA == 24
+    # colado no balcão pelo lado do corredor e dentro do comprimento dele
+    bal = next(i for i in lj.ITENS if i["kind"] == "balcao")
+    assert abs((m["x"] - m["w"] / 2) - (bal["x"] + bal["w"] / 2)) < 1e-9
+    assert bal["z"] - bal["d"] / 2 < m["z"] - m["d"] / 2 and m["z"] + m["d"] / 2 < bal["z"] + bal["d"] / 2
+    est = [
+        {"produto_codigo": "A", "produto_nome": "PROD A", "estante_num": 24, "nivel": 2, "coluna": 0},
+        {"produto_codigo": "B", "produto_nome": "PROD B", "estante_num": 24, "nivel": 0, "coluna": 5},
+    ]
+    out = lj.montar([], est, [])
+    it = next(i for i in out["itens"] if i["kind"] == "madeira")
+    assert it["rot"] == "E24" and it["faixas"] == 3 and it["ocupadas"] == 2
+    assert [p["loc"] for p in it["prod"]] == ["Degrau de baixo", "Degrau de cima"]
+
+
 def test_rotas_nao_atravessam_estruturas():
     def ponto(rota, s):
         pts = list(rota) + [rota[0]]
@@ -222,7 +239,7 @@ def test_montar_loja_agrupa_e_ignora():
 def test_exemplo_da_loja():
     import dados as dd2
     d = dd2.loja_exemplo()
-    assert len(d["itens"]) == 24 and any(i["prod"] for i in d["itens"])
+    assert len(d["itens"]) == 25 and any(i["prod"] for i in d["itens"])
 
 
 # ── Barracão ────────────────────────────────────────────────────────────────
@@ -369,8 +386,9 @@ def test_ocupacao_do_galpao_por_parte():
 def test_ocupacao_da_loja_por_faixas_de_endereco():
     import loja as ljt, dados as ddp
     # 12 gôndolas × 18 (3 andares × 6 faces) + estantes por nível + Estante Parede 6 × 6 + ilha (12) + mostruário (20)
+    # + Expositor de Madeira (3 degraus)
     out = ljt.montar([], [], [])
-    assert sum(i["faixas"] for i in out["itens"]) == 12 * 18 + (4 + 6 + 7 + 6 + 4 + 5 + 4 + 4) + 36 + 12 + 20
+    assert sum(i["faixas"] for i in out["itens"]) == 12 * 18 + (4 + 6 + 7 + 6 + 4 + 5 + 4 + 4) + 36 + 12 + 20 + 3
     assert next(i for i in out["itens"] if i["kind"] == "balcao")["faixas"] == 0
     # duas faces/andares na G7 (a mesma face e andar com 2 produtos conta uma vez) e um nível na E1
     gond = [
@@ -380,7 +398,7 @@ def test_ocupacao_da_loja_por_faixas_de_endereco():
     ]
     est = [{"produto_codigo": "A", "produto_nome": "A", "estante_num": 1, "nivel": 3}]
     o = ddp.ocupacao_loja(ljt.montar(gond, est, []))
-    assert o["ocupadas"] == 3 and o["total"] == 324 and o["pct"] == ddp.percentual(3, 324)
+    assert o["ocupadas"] == 3 and o["total"] == 327 and o["pct"] == ddp.percentual(3, 327)
 
 
 def test_capacidades_independentes_de_cada_area():
