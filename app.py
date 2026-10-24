@@ -15,6 +15,7 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
+import barracao as br
 import dados as dd
 
 ALTURA_MAPA = 720
@@ -157,10 +158,12 @@ if mapa == "galpao":
 elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]
+    gaiolas = [g for p in pal for g in br.gaiolas_do(p)]
     chips = [
-        _stat(f"de {len(pal)} paletes com bag", len(ocupados), "#c99d66"),
+        _stat(f"de {len(pal)} paletes ocupados", len(ocupados), "#c99d66"),
+        _stat(f"gaiolas (até {br.GAIOLAS_MAX} por pilha)", len(gaiolas)),
         _stat("livres", len(pal) - len(ocupados)),
-        _stat("unidades", f"{sum(p['q'] for p in ocupados):g}"),
+        _stat("unidades", f"{sum(g['q'] for g in gaiolas):g}"),
         _stat("produtos", len(dados["catalogo"])),
         _stat(f"fileiras · corredor de {dados['corredor']:g} m", dados["fileiras"]),
     ]
