@@ -41,7 +41,8 @@ const D = /*__DADOS__*/null;
 const ORANGE = 0xe87722, GREEN = 0x2e9e4f;
 const C_PAREDE = 0xd2cdc2, C_VERGA = 0xbdb7aa, C_MADEIRA = 0xc99d66, C_BAG = 0xe6dfcf, C_EST = 0x8B5CF6, C_FADE = 0xefece4;
 const W = D.w, DP = D.d, PH = D.h, E = D.esp;
-const state = { sel: null, matched: new Set(), fileira: 0, paredesAltas: true };
+// Abre com as paredes em corte (1,3 m), como o app Gondolas: as de 6 m tapam as pilhas de gaiolas.
+const state = { sel: null, matched: new Set(), fileira: 0, paredesAltas: false };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 const $ = (id) => document.getElementById(id);
 const fold = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -264,7 +265,8 @@ const ALTURA_CARGA = Math.max(2.2, ...pal.map((e) => e.h + 0.4));
 const alturaVista = () => (state.paredesAltas ? PH : ALTURA_CARGA);
 const vistaTudo = (animar = true) => enquadrar({ x0: 0, x1: W, z0: 0, z1: DP }, alturaVista(), animar);
 $("bVista").onclick = () => { state.fileira = 0; marcarChips(); pintar(); vistaTudo(); };
-$("bParede").onclick = () => { state.paredesAltas = !state.paredesAltas; $("bParede").classList.toggle("off", !state.paredesAltas); $("bParede").textContent = state.paredesAltas ? "Paredes: reais" : "Paredes: em corte"; montarParedes(); };
+const marcarParede = () => { $("bParede").classList.toggle("off", !state.paredesAltas); $("bParede").textContent = state.paredesAltas ? "Paredes: reais" : "Paredes: em corte"; };
+$("bParede").onclick = () => { state.paredesAltas = !state.paredesAltas; marcarParede(); montarParedes(); };
 
 // ── Chips de fileira ────────────────────────────────────────────────────────
 function marcarChips() { document.querySelectorAll("#chips .chip").forEach((b) => b.classList.toggle("on", +b.dataset.f === state.fileira)); }
@@ -398,7 +400,7 @@ function frame(now) {
 const ocup = pal.filter((e) => e.ocupado).length, nGaiolas = pal.reduce((s, e) => s + e.gaiolas.length, 0);
 const un = pal.reduce((s, e) => s + e.gaiolas.reduce((t, g) => t + (g.q || 0), 0), 0);
 $("stats").innerHTML = `<b>${ocup}</b> de ${pal.length} paletes ocupados · <b>${nGaiolas}</b> gaiolas · <b>${fmt.format(un)}</b> un · corredor de manobra de <b>${fmt.format(D.corredor)} m</b>`;
-$("bParede").textContent = "Paredes: reais";
+marcarParede();
 montarParedes(); redimensionar(); pintar();
 requestAnimationFrame(frame);
 /*__UI_JS__*/
