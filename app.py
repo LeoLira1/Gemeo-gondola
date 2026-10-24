@@ -7,6 +7,7 @@ o token nunca chega ao navegador.
 from __future__ import annotations
 
 import base64
+import importlib
 import json
 import os
 from datetime import datetime
@@ -15,8 +16,18 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-import barracao as br
-import dados as dd
+import barracao
+import dados
+import estocados
+import galpao
+import loja
+
+# O Streamlit Cloud troca os arquivos com o app no ar e reroda só o app.py: os módulos já
+# importados ficariam na versão velha (foi o AttributeError de br.gaiolas_do depois de um
+# deploy). Recarrega na ordem das dependências — são módulos pequenos, custa milissegundos.
+for _modulo in (estocados, galpao, loja, barracao, dados):
+    importlib.reload(_modulo)
+br, dd = barracao, dados
 
 ALTURA_MAPA = 720
 UI_CSS = Path(__file__).with_name("ui.css")
