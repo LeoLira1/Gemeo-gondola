@@ -136,7 +136,7 @@ function montarParedes() {
   dirty = true;
 }
 
-// ── Paletes e bags ──────────────────────────────────────────────────────────
+// ── Paletes e pilhas de gaiolas ─────────────────────────────────────────────
 const pal = [];
 const matVaga = new THREE.MeshBasicMaterial({ color: 0xcfcbc1, transparent: true, opacity: 0.4, depthWrite: false });
 const rotulos = [];
@@ -153,23 +153,30 @@ function labelTex(txt, estilo) {
     const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
   })());
 }
+// Cada palete leva uma pilha de até D.gaiolasMax gaiolas (estrado + carga), uma em cima da outra:
+// a do chão é o próprio palete (p.c/p.n/p.q) e as de cima vêm em p.g, com o nível em nv.
+const PASSO = D.palete.h + D.bag.h;
 for (const p of D.pal) {
   const x = wx(p.x), z = wz(p.z), ocupado = !!p.c.trim();
-  const e = { p, x, z, w: D.palete.x, d: D.palete.z, h: D.palete.h + (ocupado ? D.bag.h : 0), ocupado, matched: false, bag: null, hit: null, label: null };
-  addBox(scene, x - D.palete.x / 2, x + D.palete.x / 2, 0, D.palete.h, z - D.palete.z / 2, z + D.palete.z / 2, C_MADEIRA);
-  if (ocupado) {
-    e.bag = addBox(scene, x - D.bag.x / 2, x + D.bag.x / 2, D.palete.h, D.palete.h + D.bag.h, z - D.bag.z / 2, z + D.bag.z / 2, C_BAG);
-    e.bag.add(new THREE.LineSegments(edgesGeo(D.bag.x, D.bag.h, D.bag.z), new THREE.LineBasicMaterial({ color: 0xc8c1b0 })));
-    e.bag.userData.alvo = e; e.hit = e.bag;
-  } else {
+  const gaiolas = ocupado ? [{ nv: 1, c: p.c, n: p.n, q: p.q, e: p.e }, ...(p.g || [])] : [];
+  const e = { p, x, z, w: D.palete.x, d: D.palete.z, h: ocupado ? gaiolas.length * PASSO : D.palete.h, ocupado, gaiolas, matched: false, bags: [], hits: [], label: null };
+  if (!ocupado) {
+    addBox(scene, x - D.palete.x / 2, x + D.palete.x / 2, 0, D.palete.h, z - D.palete.z / 2, z + D.palete.z / 2, C_MADEIRA);
     const t = new THREE.Mesh(new THREE.PlaneGeometry(D.palete.x, D.palete.z), matVaga);
-    t.rotation.x = -Math.PI / 2; t.position.set(x, D.palete.h + 0.005, z); t.userData.alvo = e; scene.add(t); e.hit = t;
+    t.rotation.x = -Math.PI / 2; t.position.set(x, D.palete.h + 0.005, z); t.userData.alvo = e; scene.add(t); e.hits.push(t);
+  }
+  for (const g of gaiolas) {
+    const y0 = (g.nv - 1) * PASSO;
+    addBox(scene, x - D.palete.x / 2, x + D.palete.x / 2, y0, y0 + D.palete.h, z - D.palete.z / 2, z + D.palete.z / 2, C_MADEIRA);
+    const bag = addBox(scene, x - D.bag.x / 2, x + D.bag.x / 2, y0 + D.palete.h, y0 + PASSO, z - D.bag.z / 2, z + D.bag.z / 2, C_BAG);
+    bag.add(new THREE.LineSegments(edgesGeo(D.bag.x, D.bag.h, D.bag.z), new THREE.LineBasicMaterial({ color: 0xc8c1b0 })));
+    bag.userData.alvo = e; e.bags.push({ mesh: bag, g }); e.hits.push(bag);
   }
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(p.rot.replace("BAR-", ""), "n"), transparent: true, depthTest: false }));
   s.renderOrder = 10; s.position.set(x, e.h + 0.45, z); s.userData = { base: 0.8, lod: 70, txt: p.rot.replace("BAR-", "") }; scene.add(s); rotulos.push(s); e.label = s;
   pal.push(e);
 }
-const hits = pal.map((e) => e.hit);
+const hits = pal.flatMap((e) => e.hits);
 function setRotulo(s, estilo) { s.material.map = labelTex(s.userData.txt, estilo); s.material.needsUpdate = true; }
 
 // seleção e hover
@@ -183,9 +190,9 @@ hoverBox.visible = false; scene.add(hoverBox);
 
 function pintar() {
   for (const e of pal) {
-    e.matched = e.ocupado && isMatch(e.p);
+    e.matched = e.gaiolas.some(isMatch);
     const fade = state.fileira && e.p.f !== state.fileira;
-    if (e.bag) e.bag.material = getMat(e.matched ? GREEN : fade ? lerpHex(e.p.e ? C_EST : C_BAG, C_FADE, 0.7) : e.p.e ? C_EST : C_BAG);
+    for (const { mesh, g } of e.bags) mesh.material = getMat(isMatch(g) ? GREEN : fade ? lerpHex(g.e ? C_EST : C_BAG, C_FADE, 0.7) : g.e ? C_EST : C_BAG);
     setRotulo(e.label, state.sel === e ? "s" : e.matched ? "h" : "n");
     e.label.userData.fade = !!fade;
   }
@@ -222,7 +229,9 @@ function enquadrar(r, h, animar = true) {
   if (animar) voarPara(alvo, pos); else { camera.position.copy(pos); controls.target.copy(alvo); controls.update(); }
   dirty = true;
 }
-const alturaVista = () => (state.paredesAltas ? PH : 2.2);
+// Em corte, enquadra até o topo da pilha mais alta (4 gaiolas passam de 5 m).
+const ALTURA_CARGA = Math.max(2.2, ...pal.map((e) => e.h + 0.4));
+const alturaVista = () => (state.paredesAltas ? PH : ALTURA_CARGA);
 const vistaTudo = (animar = true) => enquadrar({ x0: 0, x1: W, z0: 0, z1: DP }, alturaVista(), animar);
 $("bVista").onclick = () => { state.fileira = 0; marcarChips(); pintar(); vistaTudo(); };
 $("bParede").onclick = () => { state.paredesAltas = !state.paredesAltas; $("bParede").classList.toggle("off", !state.paredesAltas); $("bParede").textContent = state.paredesAltas ? "Paredes: reais" : "Paredes: em corte"; montarParedes(); };
@@ -237,7 +246,7 @@ function irFileira(f) {
   state.fileira = f; marcarChips(); pintar();
   if (!f) { vistaTudo(); return; }
   const es = pal.filter((e) => e.p.f === f), z0 = Math.min(...es.map((e) => e.z)) - 1.2, z1 = Math.max(...es.map((e) => e.z)) + 1.2;
-  enquadrar({ x0: 0, x1: W, z0, z1 }, 2.2);
+  enquadrar({ x0: 0, x1: W, z0, z1 }, ALTURA_CARGA);
 }
 {
   const mk = (txt, f) => { const b = document.createElement("button"); b.className = "chip"; b.dataset.f = f; b.innerHTML = `${txt}<span class="dot"></span>`; b.onclick = () => irFileira(f); $("chips").appendChild(b); };
@@ -248,9 +257,10 @@ function irFileira(f) {
 
 // ── Cartão e tooltip ────────────────────────────────────────────────────────
 function descrever(e) {
-  const p = e.p;
-  return { titulo: `${p.rot} · ${p.e ? "Palete de estocado (fora do saldo)" : "Palete com bag"}`, sub: `Fileira ${p.f}` + (e.ocupado ? "" : " · palete livre"),
-    linhas: e.ocupado ? [{ l: "Bag", p: p.n || p.c, q: p.q, m: isMatch(p), cod: p.c }] : [] };
+  const p = e.p, k = e.gaiolas.length;
+  return { titulo: `${p.rot} · ${k ? `${k} de ${D.gaiolasMax} gaiola${k > 1 ? "s" : ""} na pilha` : "palete livre"}`, sub: `Fileira ${p.f}` + (e.ocupado ? "" : " · palete livre"),
+    // de cima para baixo, como a pilha é vista
+    linhas: [...e.gaiolas].reverse().map((g) => ({ l: `N${g.nv}` + (g.e ? " · estocado" : ""), p: g.n || g.c, q: g.q, m: isMatch(g), cod: g.c })) };
 }
 function mostrarCartao(e) {
   const d = descrever(e), el = $("info");
@@ -284,7 +294,7 @@ function buscarProduto() {
   const achados = termos.length ? catalogo.filter((p) => termos.every((t) => p.k.includes(t))) : [];
   state.matched = new Set(achados.map((p) => chave(p.c, p.n, p.e)));
   pintar(); marcarPontos();
-  const n = pal.filter((e) => e.matched).length, un = pal.filter((e) => e.matched).reduce((s, e) => s + (e.p.q || 0), 0);
+  const n = pal.filter((e) => e.matched).length, un = pal.reduce((s, e) => s + e.gaiolas.filter(isMatch).reduce((t, g) => t + (g.q || 0), 0), 0);
   $("msg").innerHTML = !termos.length ? "" : !achados.length ? "nenhum produto no barracão"
     : `<b>${achados.length}</b> produto${achados.length > 1 ? "s" : ""} · <b>${n}</b> palete${n === 1 ? "" : "s"} · ${fmt.format(un)} un`;
   if (state.sel) mostrarCartao(state.sel);
@@ -355,8 +365,9 @@ function frame(now) {
 }
 
 // ── Início ──────────────────────────────────────────────────────────────────
-const ocup = pal.filter((e) => e.ocupado).length, un = pal.reduce((s, e) => s + (e.ocupado ? e.p.q || 0 : 0), 0);
-$("stats").innerHTML = `<b>${ocup}</b> de ${pal.length} paletes com bag · <b>${fmt.format(un)}</b> un · corredor de manobra de <b>${fmt.format(D.corredor)} m</b>`;
+const ocup = pal.filter((e) => e.ocupado).length, nGaiolas = pal.reduce((s, e) => s + e.gaiolas.length, 0);
+const un = pal.reduce((s, e) => s + e.gaiolas.reduce((t, g) => t + (g.q || 0), 0), 0);
+$("stats").innerHTML = `<b>${ocup}</b> de ${pal.length} paletes ocupados · <b>${nGaiolas}</b> gaiolas · <b>${fmt.format(un)}</b> un · corredor de manobra de <b>${fmt.format(D.corredor)} m</b>`;
 $("bParede").textContent = "Paredes: reais";
 montarParedes(); redimensionar(); pintar();
 requestAnimationFrame(frame);

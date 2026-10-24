@@ -279,10 +279,45 @@ def test_montar_barracao_do_banco():
     assert len(br.montar([])["pal"]) == 100                                      # tabela vazia → layout padrão
 
 
+def test_barracao_pilha_de_gaiolas():
+    linhas = [
+        {"id": 1, "rotulo": "BAR-01", "pos_x": 130, "pos_z": 930, "produto_codigo": "A", "produto_nome": "PROD A", "quantidade": 2},
+        {"id": 2, "rotulo": "BAR-02", "pos_x": 265, "pos_z": 930, "produto_codigo": "", "produto_nome": "", "quantidade": 0},
+    ]
+    gaiolas = [
+        {"endereco_id": 1, "nivel": 3, "produto_codigo": "C", "produto_nome": "PROD C", "quantidade": 5},
+        {"endereco_id": 1, "nivel": 2, "produto_codigo": "EST:9", "produto_nome": "X · ANA", "quantidade": 1},
+        {"endereco_id": 2, "nivel": 2, "produto_codigo": "D", "produto_nome": "PROD D", "quantidade": 7},
+    ]
+    d = br.montar(linhas, gaiolas)
+    p1, p2 = d["pal"]
+    assert [(g["nv"], g["c"]) for g in br.gaiolas_do(p1)] == [(1, "A"), (2, "EST:9"), (3, "C")]
+    assert p1["g"][0]["e"] is True                                               # estocado também na gaiola de cima
+    # chão vazio com gaiola em cima: a de baixo vai para o chão
+    assert p2["c"] == "D" and p2["g"] == []
+    assert {c["c"] for c in d["catalogo"]} == {"A", "C", "D", "EST:9"}
+    assert d["gaiolasMax"] == br.GAIOLAS_MAX == 4
+    assert br.rotulo_gaiola("BAR-01", 3) == "BAR-01 · N3" and br.rotulo_gaiola("BAR-01", 1) == "BAR-01"
+    # banco de antes da pilha: sem a tabela de gaiolas, só o chão
+    assert br.montar(linhas, None)["pal"][0]["g"] == []
+
+
+def test_barracao_pilha_na_busca_global_e_na_capacidade():
+    import dados as ddp
+    t = ddp.tudo_exemplo()
+    t["barracao"] = br.montar(
+        [{"id": 1, "rotulo": "BAR-01", "pos_x": 130, "pos_z": 930, "produto_codigo": "A", "produto_nome": "PROD A", "quantidade": 2}],
+        [{"endereco_id": 1, "nivel": 2, "produto_codigo": "B", "produto_nome": "PROD B", "quantidade": 1}])
+    idx = [e for e in ddp.indice_global(t["galpao"], t["loja"], t["barracao"]) if e["a"] == "barracao"]
+    assert [(e["c"], e["w"]) for e in idx] == [("A", "BAR-01"), ("B", "BAR-01 · N2")]
+    assert ddp.ocupacao_barracao(t["barracao"]) == ddp.percentual(2, 4)       # 2 gaiolas de 1 palete × 4
+
+
 def test_barracao_exemplo():
     import dados as ddb
     d = ddb.barracao_exemplo()
     assert len(d["pal"]) == 100 and any(p["c"] for p in d["pal"]) and any(not p["c"] for p in d["pal"])
+    assert any(p["g"] for p in d["pal"]) and all(len(br.gaiolas_do(p)) <= br.GAIOLAS_MAX for p in d["pal"])
 
 
 # ── Busca global ────────────────────────────────────────────────────────────
