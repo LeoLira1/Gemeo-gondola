@@ -20,6 +20,12 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   Encostado no balcão, no vão entre a G9 e a G8, o **Expositor de Madeira**: escada de 3 degraus com 6 produtos em
   cada (estante 24, `nivel` = degrau, 0 = o de baixo); o cartão mostra `Degrau de cima`. O cliente contorna ele pelo
   vão entre as gôndolas.
+  **Caixas nas prateleiras:** cada caixa que o Gondolas coloca (`gondola_layout`, `estante_layout`) aparece na
+  estrutura, na cor gravada (`cor_hex`, por categoria). Gôndola: `andar` + `pos_x`/`pos_z` na escala do mapa, igual ao
+  app. Estantes, Estante Parede, EDR-300 e expositores: o nível escolhe a prateleira e coluna/slot dividem o
+  comprimento (posição proporcional, não a grade exata de cada cena do app). Ilha: 5 caixas por espaço; mostruário:
+  20 posições no tampo. Com busca de produto, as caixas dele acendem em laranja e as outras esmaecem. Botão
+  **📦 Caixas** mostra/esconde.
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
   Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
 - **Barracão:** a estrutura de 35 × 10 m (paredes de 6 m, porta, portão e porta na parede da frente) com os paletes

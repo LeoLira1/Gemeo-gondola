@@ -293,6 +293,8 @@ _PRODUTOS_DEMO = [
     ("830901", "INSETICIDA FASTAC DUO 5L"),
     ("940020", "SAL MINERAL BOVINO 25KG"),
 ]
+# Cores por categoria do Gondolas (TursoService.categoriaCores): o cor_hex que vai para o layout.
+_CORES_DEMO = ["#2e7d4f", "#2c5fb0", "#6b4a2b", "#d9b46a", "#e87722", "#8b1a1a", "#c8a000", "#4a4a8a"]
 
 
 _TERCEIROS_DEMO = [
@@ -359,11 +361,11 @@ def dados_exemplo() -> dict[str, Any]:
 # ── Loja (gôndolas e estantes) ──────────────────────────────────────────────
 
 SQL_GONDOLAS = (
-    "SELECT DISTINCT produto_codigo, produto_nome, gondola_num, andar, pos_x, pos_z "
+    "SELECT DISTINCT produto_codigo, produto_nome, gondola_num, andar, pos_x, pos_z, cor_hex "
     "FROM gondola_layout ORDER BY produto_nome"
 )
 SQL_ESTANTES = (
-    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel, coluna FROM estante_layout "
+    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel, coluna, slot, cor_hex FROM estante_layout "
     f"WHERE estante_num NOT IN ({', '.join(map(str, lj.ESTANTES_REMOVIDAS))}) "
     f"AND NOT (estante_num = {lj.NELLORE} AND nivel = 0) ORDER BY produto_nome"
 )
@@ -395,16 +397,22 @@ def loja_exemplo() -> dict[str, Any]:
             if it["tipo"] == "gondola":
                 face, andar = rnd.randint(1, 6), rnd.randint(0, 2)
                 ang = math.radians(90 - 60 * (face - 1))
+                raio = lj.GONDOLA_PRATELEIRAS[andar][0] * 0.7      # na escala da cena de detalhe do app
                 gond.append({"produto_codigo": cod, "produto_nome": nome, "gondola_num": it["n"],
-                             "andar": andar, "pos_x": math.cos(ang), "pos_z": math.sin(ang)})
+                             "andar": andar, "pos_x": raio * math.cos(ang), "pos_z": raio * math.sin(ang),
+                             "cor_hex": rnd.choice(_CORES_DEMO)})
                 qtd.append({"produto_codigo": cod, "local_tipo": "gondola", "local_num": it["n"],
                             "face_ou_coluna": face, "andar_ou_nivel": andar, "quantidade": q})
             else:
                 nivel = rnd.randint(0, lj.niveis_produto(it["n"]) - 1)
                 num = it["n"] + (rnd.randint(0, 5) if it["kind"] == "parede" else 0)
                 col = rnd.randint(0, lj.PRODUTOS_POR_ESPACO_ILHA - 1) if it["kind"] == "ilha" else 0
+                if it["kind"] == "madeira":
+                    col = rnd.randint(0, 5)                          # 6 produtos por degrau
+                elif it["kind"] not in ("ilha", "mostruario"):
+                    col = rnd.randint(0, 2)
                 est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel,
-                            "coluna": col})
+                            "coluna": col, "slot": rnd.randint(0, 3), "cor_hex": rnd.choice(_CORES_DEMO)})
                 qtd.append({"produto_codigo": cod, "local_tipo": "estante", "local_num": num,
                             "face_ou_coluna": col, "andar_ou_nivel": nivel, "quantidade": q})
     dados = lj.montar(gond, est, qtd)
