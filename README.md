@@ -17,6 +17,9 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   produto); o cartão mostra `Espaço 3 · produto 2`. Digite `ilha` no campo Nº para ir até ela.
   Na parede da direita, entre a E1 e a cozinha, o **mostruário**: um palete de madeira com ~20 tipos de ferragem e
   ferramenta (estante 23, `nivel` = posição 0–19); o cartão mostra `Posição 7`. Digite `mostruário` (ou `E23`) no campo Nº.
+  Encostado no balcão, no vão entre a G9 e a G8, o **Expositor de Madeira**: escada de 3 degraus com 6 produtos em
+  cada (estante 24, `nivel` = degrau, 0 = o de baixo); o cartão mostra `Degrau de cima`. O cliente contorna ele pelo
+  vão entre as gôndolas.
   **Caixas nas prateleiras:** cada caixa que o Gondolas coloca (`gondola_layout`, `estante_layout`) aparece na
   estrutura, na cor gravada (`cor_hex`, por categoria). Gôndola: `andar` + `pos_x`/`pos_z` na escala do mapa, igual ao
   app. Estantes, Estante Parede, EDR-300 e expositores: o nível escolhe a prateleira e coluna/slot dividem o

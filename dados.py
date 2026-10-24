@@ -407,7 +407,9 @@ def loja_exemplo() -> dict[str, Any]:
                 nivel = rnd.randint(0, lj.niveis_produto(it["n"]) - 1)
                 num = it["n"] + (rnd.randint(0, 5) if it["kind"] == "parede" else 0)
                 col = rnd.randint(0, lj.PRODUTOS_POR_ESPACO_ILHA - 1) if it["kind"] == "ilha" else 0
-                if it["kind"] not in ("ilha", "mostruario"):
+                if it["kind"] == "madeira":
+                    col = rnd.randint(0, 5)                          # 6 produtos por degrau
+                elif it["kind"] not in ("ilha", "mostruario"):
                     col = rnd.randint(0, 2)
                 est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel,
                             "coluna": col, "slot": rnd.randint(0, 3), "cor_hex": rnd.choice(_CORES_DEMO)})
