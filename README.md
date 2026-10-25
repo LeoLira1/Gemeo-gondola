@@ -2,11 +2,15 @@
 
 Cópia web, **somente leitura**, dos mapas 3D do galpão e da loja do app Flutter
 [LeoLira1/Gondolas](https://github.com/LeoLira1/Gondolas). Planta, numeração
-(129 posições, 12 ruas, Parte 1 = 1–85, Parte 2 = 86–129 em serpentina) e regras
+(138 posições, 15 ruas, Parte 1 = 1–85, Parte 2 = 86–129 em serpentina + 9 gaiolas 130–138) e regras
 de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 `lib/codigos_vinculados.dart`. Se a planta mudar lá, atualize `galpao.py`.
 
-- **Galpão:** 129 posições, pilhas de racks, cor por saldo (vermelho/azul), busca por número e produto.
+- **Galpão:** 138 posições, pilhas de racks, cor por saldo (vermelho/azul), busca por número e produto.
+- **Gaiolas no fim dos corredores (Parte 2):** no fundo de cada um dos 3 corredores (lado do 86) ficam 3 gaiolas lado a
+  lado, de uma fileira à outra: Rua 13 (130–132) entre a R12 e a R11, Rua 14 (133–135) entre a R11 e a R10 e Rua 15
+  (136–138) entre a R10 e a R9, numeradas da esquerda para a direita. São racks como os outros (empilham até 4, aceitam
+  rack misto), com o lado de 1,20 m em Z como as fileiras e passo de 1,05 m. Posição estimada, em `galpao.py`.
 - **Rack misto:** o Gondolas deixa até 5 produtos no mesmo palete (o primeiro em `galpao_racks`, os outros em
   `galpao_rack_itens`). Aqui o rack misto ganha duas faixas escuras, o cartão e a dica listam todos os produtos, e a
   busca e a cor de saldo valem para qualquer um deles. Banco sem a tabela nova: o galpão segue só com os racks.
@@ -56,7 +60,7 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   empilhadeira contrabalançada amarela (`vehicle_forklift_red_c01`, NVIDIA SimReady, 3,74 × 1,36 m; o modelo vem vermelho e a cena pinta a carroceria de amarelo, `CONTRABALANCADA_COR`), paralela à frente
   e com o garfo para o lado da mesa. Profundidade, queda e posição estão em `galpao.py` (`corredor()`, `contrabalancada()`).
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
-  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 44 × 4), Barracão (gaiolas ÷ 100 paletes × 4) e Loja
+  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (gaiolas ÷ 100 paletes × 4) e Loja
   (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do
   galpão mostra a da parte aberta.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token

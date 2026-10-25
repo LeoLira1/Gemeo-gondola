@@ -213,7 +213,8 @@ def montar(
             for p in g.POSICOES
         ],
         "ruas": [
-            {"n": r.numero, "p": r.parte, "eixo": r.eixo, "de": r.primeiro_numero, "ate": r.ultimo_numero, "lado": r.lado_corredor}
+            {"n": r.numero, "p": r.parte, "eixo": r.eixo, "de": r.primeiro_numero, "ate": r.ultimo_numero, "lado": r.lado_corredor,
+             "gaiola": r.rack_atravessado, "centro": r.centro}
             for r in g.RUAS
         ],
         "geo": {
@@ -495,7 +496,7 @@ def estocados_da_cena(linhas, galpao: dict[str, Any], barracao: dict[str, Any]) 
 
 
 def resumo_galpao(galpao: dict[str, Any]) -> str:
-    """"38 livres · 30 estocados · 61 loja"; vagas = posições × níveis (129 × 4 = 516)."""
+    """"38 livres · 30 estocados · 61 loja"; vagas = posições × níveis (138 × 4 = 552)."""
     total = len(galpao["posicoes"]) * galpao["geo"]["niveisMax"]
     return es.resumo_ocupacao(total, (r["c"] for pilha in galpao["pilhas"].values() for r in pilha))
 

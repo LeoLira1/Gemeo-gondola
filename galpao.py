@@ -19,6 +19,7 @@ COMPRIMENTO_RACK = 1.20   # lado que corre ao longo da rua
 LARGURA_RACK = 1.00       # lado atravessado à rua
 ALTURA_NIVEL = 1.10
 PASSO_POSICAO = 1.34      # rack (1,20) + folga
+PASSO_GAIOLA = 1.05       # gaiolas do fim do corredor: rack atravessado (1,00) + folga
 PASSO_NIVEL = 1.16        # altura (1,10) + encaixe
 NIVEIS_MAX = 4
 PARTES = (1, 2)
@@ -35,6 +36,10 @@ class Rua:
     primeiro_numero: int
     primeiro_no_fim: bool
     lado_corredor: int
+    # Gaiolas do fim dos corredores da Parte 2: lado a lado em X, mas cada uma com o lado de 1,20 m em Z,
+    # como as fileiras vizinhas (de comprido, três não caberiam no corredor de 3,45 m).
+    rack_atravessado: bool = False
+    passo: float = PASSO_POSICAO
 
     @property
     def ultimo_numero(self) -> int:
@@ -60,6 +65,11 @@ RUAS: tuple[Rua, ...] = (
     Rua(10, 2, "z", 24.90, 0, 11, 97, True, -1),
     Rua(11, 2, "z", 20.45, 0, 11, 108, False, -1),
     Rua(12, 2, "z", 16.00, 0, 11, 119, True, -1),
+    # Parte 2 — 3 gaiolas no fim (fundo, lado do 86) de cada corredor (130–138), da esquerda para a direita:
+    # Rua 13 entre a 12 e a 11, Rua 14 entre a 11 e a 10, Rua 15 entre a 10 e a 9.
+    Rua(13, 2, "x", -6.70, 18.225, 3, 130, False, 1, True, PASSO_GAIOLA),
+    Rua(14, 2, "x", -6.70, 22.675, 3, 133, False, 1, True, PASSO_GAIOLA),
+    Rua(15, 2, "x", -6.70, 27.125, 3, 136, False, 1, True, PASSO_GAIOLA),
 )
 
 
@@ -75,19 +85,23 @@ class Posicao:
         return self.rua.parte
 
     @property
+    def _comprido_em_z(self) -> bool:
+        return (self.rua.eixo == "z") != self.rua.rack_atravessado
+
+    @property
     def tamanho_x(self) -> float:
-        return LARGURA_RACK if self.rua.eixo == "z" else COMPRIMENTO_RACK
+        return LARGURA_RACK if self._comprido_em_z else COMPRIMENTO_RACK
 
     @property
     def tamanho_z(self) -> float:
-        return COMPRIMENTO_RACK if self.rua.eixo == "z" else LARGURA_RACK
+        return COMPRIMENTO_RACK if self._comprido_em_z else LARGURA_RACK
 
 
 def _montar_posicoes() -> tuple[Posicao, ...]:
     lista: list[Posicao] = []
     for rua in RUAS:
         for i in range(rua.quantidade):
-            desloc = (i - (rua.quantidade - 1) / 2) * PASSO_POSICAO
+            desloc = (i - (rua.quantidade - 1) / 2) * rua.passo
             ordinal = rua.quantidade - 1 - i if rua.primeiro_no_fim else i
             lista.append(
                 Posicao(

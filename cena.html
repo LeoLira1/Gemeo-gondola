@@ -11,7 +11,7 @@
   <div id="top">
     <div class="row">
       <div class="panel seg" id="partes"></div>
-      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129, escada, chuveiro, mesa, empilhadeira" autocomplete="off"></div>
+      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–138, escada, chuveiro, mesa, empilhadeira" autocomplete="off"></div>
       <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
       <div class="panel chips" id="chips"></div>
       <span id="msg"></span>
@@ -383,7 +383,8 @@ for (const p of D.posicoes) {
   casas.set(p.n, { p, raiz, stack, rect, tile, racks, rotulo, topo, vazia: niveis === 0 });
 }
 
-// Rótulos de rua (R1…R12) na ponta de menor coordenada de cada rua
+// Rótulos de rua (R1…R15) na ponta de menor coordenada de cada rua; nas gaiolas do fim dos corredores
+// (R13–R15) as fileiras encostam dos dois lados, então o rótulo vai no meio da trinca, no corredor.
 const rotulosRua = new Map();
 for (const r of D.ruas) {
   const ps = D.posicoes.filter((p) => p.r === r.n);
@@ -392,7 +393,8 @@ for (const r of D.ruas) {
   const lado = r.lado * 0.9;      // do lado do corredor: as ruas em par (4/5, 6/7) não se sobrepõem
   const s = makeLabel("R" + r.n, "r", 1);
   s.userData.base = 1.5;
-  s.position.set(eixoZ ? ref.x + lado : ref.x - 2.3, 0.15, eixoZ ? ref.z - 2.3 : ref.z + lado);
+  if (r.gaiola) s.position.set(r.centro, 0.15, ref.z + r.lado * (ref.sz / 2 + 1.1));
+  else s.position.set(eixoZ ? ref.x + lado : ref.x - 2.3, 0.15, eixoZ ? ref.z - 2.3 : ref.z + lado);
   scene.add(s);
   rotulosRua.set(r.n, s);
 }
