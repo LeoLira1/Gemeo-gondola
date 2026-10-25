@@ -481,12 +481,28 @@ def test_empilhadeira_em_frente_a_mesa_dentro_do_piso():
                     and e["z0"] < q.z + q.tamanho_z / 2 and e["z1"] > q.z - q.tamanho_z / 2), q.numero
 
 
-def test_empilhadeira_aponta_para_um_glb_que_existe():
+def test_empilhadeiras_apontam_para_glb_que_existem():
     from pathlib import Path
     import dados as ddm
-    e = ddm.dados_exemplo()["empilhadeira"]
-    assert e["modelo"].startswith("app/static/")                             # servido pelo enableStaticServing
-    assert (Path(__file__).resolve().parent.parent / e["modelo"].removeprefix("app/")).is_file()
+    emps = ddm.dados_exemplo()["empilhadeiras"]
+    assert [e["nome"] for e in emps] == ["Empilhadeira patolada", "Empilhadeira contrabalançada"]
+    for e in emps:
+        assert e["modelo"].startswith("app/static/")                         # servido pelo enableStaticServing
+        assert (Path(__file__).resolve().parent.parent / e["modelo"].removeprefix("app/")).is_file()
+
+
+def test_contrabalancada_no_corredor_de_carregamento():
+    e, c, m = g.contrabalancada(), g.corredor(), g.mesa()
+    assert e["corredor"] and e["parte"] == c["parte"] == m["parte"]
+    fora = sorted((c["borda"], c["borda"] + c["sentido"] * c["profundidade"]))
+    assert fora[0] < e["z0"] and e["z1"] < fora[1]                           # inteira dentro da faixa do corredor
+    assert abs((e["x1"] - e["x0"]) - (g.CONTRABALANCADA_TRAS + g.CONTRABALANCADA_FRENTE)) < 1e-6   # paralela à frente
+    ps = [q for q in g.POSICOES if q.parte == c["parte"]]
+    assert min(q.x for q in ps) < e["x0"] and e["x1"] < max(q.x for q in ps)  # dentro da largura do galpão
+    import math
+    garfo = (math.sin(e["rot"]), math.cos(e["rot"]))                          # +Z do modelo depois da rotação
+    assert garfo[0] * m["frente"] < -0.99                                     # garfo para o lado da mesa
+
 
 
 # ── Rack misto (até 5 produtos no mesmo palete, no Gondolas) ───────────────

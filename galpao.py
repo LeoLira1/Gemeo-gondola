@@ -360,10 +360,55 @@ def empilhadeira() -> dict:
     x = x_frente_mesa + frente * (EMPILHADEIRA_FOLGA + EMPILHADEIRA_LARGURA / 2)
     zs = sorted((z_tras, z - sentido * EMPILHADEIRA_FRENTE))
     return {
-        "parte": m["parte"], "rua": m["rua"], "modelo": EMPILHADEIRA_MODELO,
+        "parte": m["parte"], "rua": m["rua"], "modelo": EMPILHADEIRA_MODELO, "corredor": False,
+        "nome": "Empilhadeira patolada", "onde": f"Em frente à mesa de expedição, na ponta da Rua {m['rua']}",
         "x": round(x, 4), "z": round(z, 4), "rot": round(math.pi, 6) if sentido > 0 else 0.0,   # garfo para dentro
         "x0": round(x - EMPILHADEIRA_LARGURA / 2, 4), "x1": round(x + EMPILHADEIRA_LARGURA / 2, 4),
         "z0": round(zs[0], 4), "z1": round(zs[1], 4),
         "largura": EMPILHADEIRA_LARGURA, "comprimento": EMPILHADEIRA_TRAS + EMPILHADEIRA_FRENTE,
         "altura": EMPILHADEIRA_ALTURA,
+    }
+
+
+# ── Corredor de carregamento e empilhadeira contrabalançada (referência, modelo 3D) ──
+# Na frente aberta do Galpão 2, depois da rampa, o corredor de carregamento: uma faixa de piso no nível de baixo da
+# rampa (CORREDOR_QUEDA, que a RAMPA de cena.html usa), com a largura da laje e CORREDOR_PROFUNDIDADE para fora. A contrabalançada
+# vermelha (vehicle_forklift_red_c01, NVIDIA SimReady, CC BY 4.0) fica no meio da faixa, paralela à frente do galpão,
+# com o garfo apontando para o lado da mesa. No arquivo, o garfo aponta para +Z, a traseira (contrapeso) fica em
+# Z = -1,29 m e a ponta do garfo em Z = +2,45 m. Profundidade e deslocamento são estimativas (ajustar aqui).
+CORREDOR_PARTE = 2
+CORREDOR_PROFUNDIDADE = 5.0
+CORREDOR_QUEDA = 0.18          # o corredor fica abaixo do piso do galpão (é o fim da rampa; cena.html lê daqui)
+CONTRABALANCADA_MODELO = "app/static/modelos/vehicle_forklift_red_c01.glb"
+CONTRABALANCADA_LARGURA = 1.36
+CONTRABALANCADA_TRAS = 1.29
+CONTRABALANCADA_FRENTE = 2.45
+CONTRABALANCADA_ALTURA = 2.17
+CONTRABALANCADA_DESLOC = 6.5   # da face do rack da mesa (x_fundo) até o centro da empilhadeira, ao longo da frente
+
+
+def corredor() -> dict:
+    """Faixa do corredor de carregamento: começa na borda da laje (ponta livre da mesa) e vai `profundidade` para fora."""
+    m = mesa()
+    return {"parte": CORREDOR_PARTE, "borda": round(m["z_ini"] + m["sentido"] * m["comprimento_total"], 4),
+            "sentido": m["sentido"], "profundidade": CORREDOR_PROFUNDIDADE, "queda": CORREDOR_QUEDA}
+
+
+def contrabalancada() -> dict:
+    """Mesmo formato de `empilhadeira()`; `corredor` = está no piso do corredor (nível de baixo da rampa)."""
+    m, c = mesa(), corredor()
+    cx = m["x_fundo"] + m["frente"] * CONTRABALANCADA_DESLOC
+    cz = c["borda"] + c["sentido"] * CORREDOR_PROFUNDIDADE / 2
+    d = -m["frente"]                                            # garfo para o lado da mesa
+    x = cx - d * (CONTRABALANCADA_FRENTE - CONTRABALANCADA_TRAS) / 2
+    xs = sorted((x + d * CONTRABALANCADA_FRENTE, x - d * CONTRABALANCADA_TRAS))
+    return {
+        "parte": c["parte"], "rua": m["rua"], "modelo": CONTRABALANCADA_MODELO, "corredor": True,
+        "nome": "Empilhadeira contrabalançada",
+        "onde": "No corredor de carregamento, depois da rampa",
+        "x": round(x, 4), "z": round(cz, 4), "rot": round(d * math.pi / 2, 6),   # garfo (+Z do modelo) vira o eixo X para `d`
+        "x0": round(xs[0], 4), "x1": round(xs[1], 4),
+        "z0": round(cz - CONTRABALANCADA_LARGURA / 2, 4), "z1": round(cz + CONTRABALANCADA_LARGURA / 2, 4),
+        "largura": CONTRABALANCADA_LARGURA, "comprimento": CONTRABALANCADA_TRAS + CONTRABALANCADA_FRENTE,
+        "altura": CONTRABALANCADA_ALTURA,
     }

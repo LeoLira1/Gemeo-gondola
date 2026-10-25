@@ -28,7 +28,7 @@
     <span><i style="background:#cfd3d8"></i>Escada p/ mesanino</span>
     <span><i style="background:#1b8a4a"></i>Chuveiro lava-olhos</span>
     <span><i style="background:#cecbc3"></i>Mesa de expedição</span>
-    <span><i style="background:#e8890c"></i>Empilhadeira</span>
+    <span><i style="background:#e8890c"></i>Empilhadeiras</span>
   </div>
   <div id="stats" class="panel"></div>
   <div id="tip"></div>
@@ -498,16 +498,17 @@ if (D.mesa) {
   hit.position.set(mesa.caixa.x, mesa.caixa.h / 2, mesa.caixa.z); hit.userData.mesa = true; scene.add(hit); mesa.hit = hit;
 }
 
-// Empilhadeira patolada (referência): modelo 3D da NVIDIA SimReady (.glb, CC BY 4.0), estacionada em frente à
-// mesa, no corredor da Rua 11, com o garfo para dentro. O arquivo vem do static serving do Streamlit (`app/static/...`), relativo à página.
+// Empilhadeiras (referência): modelos 3D da NVIDIA SimReady (.glb, CC BY 4.0). A patolada fica em frente à mesa, com o
+// garfo para dentro; a contrabalançada, no corredor de carregamento, depois da rampa (`corredor`: no nível de baixo).
+// O arquivo vem do static serving do Streamlit (`app/static/...`), relativo à página.
 // A cena não usa sRGB na saída: as texturas ficam lineares e as cores do glTF voltam para sRGB, como o resto.
-const empilhadeira = { grupo: new THREE.Group(), d: D.empilhadeira };
-if (D.empilhadeira && THREE.GLTFLoader) {
-  const E = D.empilhadeira;
-  empilhadeira.grupo.position.set(E.x, 0, E.z);
-  empilhadeira.grupo.rotation.y = E.rot;
-  scene.add(empilhadeira.grupo);
-  new THREE.GLTFLoader().load(new URL(E.modelo, document.baseURI).href, (gltf) => {
+const empilhadeiras = (D.empilhadeiras || []).map((E, i) => {
+  const emp = { grupo: new THREE.Group(), d: E };
+  const y = E.corredor && D.corredor ? -D.corredor.queda : 0;
+  emp.grupo.position.set(E.x, y, E.z);
+  emp.grupo.rotation.y = E.rot;
+  scene.add(emp.grupo);
+  if (THREE.GLTFLoader) new THREE.GLTFLoader().load(new URL(E.modelo, document.baseURI).href, (gltf) => {
     gltf.scene.traverse((o) => {
       if (!o.isMesh) return;
       o.castShadow = o.receiveShadow = true;
@@ -517,13 +518,14 @@ if (D.empilhadeira && THREE.GLTFLoader) {
         m.needsUpdate = true;
       }
     });
-    empilhadeira.grupo.add(gltf.scene);
+    emp.grupo.add(gltf.scene);
     dirty = true;
-  }, undefined, (err) => console.warn("empilhadeira: não carregou o modelo", err));
-  empilhadeira.caixa = { x: (E.x0 + E.x1) / 2, z: (E.z0 + E.z1) / 2, w: E.x1 - E.x0, d: E.z1 - E.z0, h: E.altura };
-  const hit = new THREE.Mesh(new THREE.BoxGeometry(empilhadeira.caixa.w, E.altura, empilhadeira.caixa.d), new THREE.MeshBasicMaterial({ visible: false }));
-  hit.position.set(empilhadeira.caixa.x, E.altura / 2, empilhadeira.caixa.z); hit.userData.empilhadeira = true; scene.add(hit); empilhadeira.hit = hit;
-}
+  }, undefined, (err) => console.warn("empilhadeira: não carregou o modelo", E.modelo, err));
+  emp.caixa = { x: (E.x0 + E.x1) / 2, y, z: (E.z0 + E.z1) / 2, w: E.x1 - E.x0, d: E.z1 - E.z0, h: E.altura };
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(emp.caixa.w, E.altura, emp.caixa.d), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.set(emp.caixa.x, y + E.altura / 2, emp.caixa.z); hit.userData.empilhadeira = i + 1; scene.add(hit); emp.hit = hit;
+  return emp;
+});
 
 // Seleção (busca por número) e destaque de hover
 const selGrupo = new THREE.Group();
@@ -595,10 +597,10 @@ function atualizarVisibilidade() {
     mesa.grupo.visible = naParteMesa;
     if (naParteMesa) alvos.push(mesa.hit);
   }
-  if (empilhadeira.hit) {
-    const naParteEmp = state.parte === D.empilhadeira.parte;
-    empilhadeira.grupo.visible = naParteEmp;
-    if (naParteEmp) alvos.push(empilhadeira.hit);
+  for (const emp of empilhadeiras) {
+    const naParteEmp = state.parte === emp.d.parte;
+    emp.grupo.visible = naParteEmp;
+    if (naParteEmp) alvos.push(emp.hit);
   }
   dirty = true;
 }
@@ -623,9 +625,10 @@ function envelope(filtro) {
     a.minX = Math.min(a.minX, D.mesa.x0); a.maxX = Math.max(a.maxX, D.mesa.x1);
     a.minZ = Math.min(a.minZ, D.mesa.z0); a.maxZ = Math.max(a.maxZ, D.mesa.z1);
   }
-  if (D.empilhadeira && filtro({ p: D.empilhadeira.parte, r: D.empilhadeira.rua })) {      // e a empilhadeira
-    a.minX = Math.min(a.minX, D.empilhadeira.x0); a.maxX = Math.max(a.maxX, D.empilhadeira.x1);
-    a.minZ = Math.min(a.minZ, D.empilhadeira.z0); a.maxZ = Math.max(a.maxZ, D.empilhadeira.z1);
+  for (const E of D.empilhadeiras || []) {                           // e as empilhadeiras
+    if (!filtro({ p: E.parte, r: E.rua })) continue;
+    a.minX = Math.min(a.minX, E.x0); a.maxX = Math.max(a.maxX, E.x1);
+    a.minZ = Math.min(a.minZ, E.z0); a.maxZ = Math.max(a.maxZ, E.z1);
   }
   return a;
 }
@@ -703,7 +706,7 @@ function montarParedes(x0, x1, z0, z1) {
 }
 // Rampa do Galpão 2: na frente aberta, pequeno declive que desce até o corredor de carregamento (metros, mesma planta dos racks).
 // O trecho à direita dela e o da esquerda (mesa) ficam no nível do piso.
-const RAMPA = { parte: 2, x0: 17.5, x1: 28.7, prof: 1.5, queda: 0.18 };
+const RAMPA = { parte: 2, x0: 17.5, x1: 28.7, prof: 1.5, queda: D.corredor ? D.corredor.queda : 0.18 };
 const ESPESSURA_LAJE = 0.2;
 function uvMundo(geo) {                              // textura em escala real: um bloco a cada TAM_TEX_PISO metros
   const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
@@ -739,6 +742,12 @@ function montarLaje(x0, x1, z0, z1) {
   geo.computeVertexNormals();
   const rampa = new THREE.Mesh(geo, M.laje); rampa.receiveShadow = true; laje.add(rampa);
 }
+// Corredor de carregamento (Galpão 2): faixa de piso no nível de baixo da rampa, com a largura da laje.
+function blocoCorredor(xa, xb, za, zb) {
+  const topo = -D.corredor.queda, geo = new THREE.BoxGeometry(xb - xa, ESPESSURA_LAJE, Math.abs(zb - za));
+  geo.translate((xa + xb) / 2, topo - ESPESSURA_LAJE / 2, (za + zb) / 2);
+  const m = new THREE.Mesh(uvMundo(geo), M.laje); m.receiveShadow = true; laje.add(m);   // a laje é refeita a cada parte
+}
 function ajustarLaje() {
   const e = envelope((p) => p.p === state.parte);
   // Paredes a ~70 cm dos paletes (e da escada, do lava-olhos e da mesa, que entram no envelope). No Galpão 2 a frente é
@@ -752,6 +761,10 @@ function ajustarLaje() {
   }
   montarParedes(x0, x1, z0, z1);
   montarLaje(x0, x1, z0, z1);
+  if (D.corredor && state.parte === D.corredor.parte) {   // corredor de carregamento, para fora da frente aberta
+    const C = D.corredor;
+    blocoCorredor(x0, x1, C.borda, C.borda + C.sentido * C.profundidade);
+  }
   const R = Math.hypot(e.maxX - e.minX, e.maxZ - e.minZ) / 2 + 4;
   const cx = (e.minX + e.maxX) / 2, cz = (e.minZ + e.maxZ) / 2;
   sun.target.position.set(cx, 0, cz);
@@ -897,12 +910,15 @@ function irParaMesa() {
   const deFrente = new THREE.Vector3(D.mesa.frente * 0.8, 0.5, D.mesa.sentido * 0.45).normalize();   // olha a mesa pela frente
   voarPara(alvo, alvo.clone().addScaledVector(deFrente, 4.2));
 }
-function irParaEmpilhadeira() {
-  if (!empilhadeira.caixa) return;
-  state.sel = null; state.parte = D.empilhadeira.parte; state.rua = null;
+function irParaEmpilhadeiras() {                     // enquadra todas (a patolada e a contrabalançada)
+  if (!empilhadeiras.length) return;
+  state.sel = null; state.parte = empilhadeiras[0].d.parte; state.rua = null;
   refrescar();
-  const cx = empilhadeira.caixa, alvo = new THREE.Vector3(cx.x, cx.h / 2, cx.z);
-  voarPara(alvo, alvo.clone().addScaledVector(new THREE.Vector3(0.75, 0.55, 0.4).normalize(), 6));
+  const cs = empilhadeiras.map((e) => e.caixa);
+  const x0 = Math.min(...cs.map((c) => c.x - c.w / 2)), x1 = Math.max(...cs.map((c) => c.x + c.w / 2));
+  const z0 = Math.min(...cs.map((c) => c.z - c.d / 2)), z1 = Math.max(...cs.map((c) => c.z + c.d / 2));
+  const alvo = new THREE.Vector3((x0 + x1) / 2, 0.8, (z0 + z1) / 2);
+  voarPara(alvo, alvo.clone().addScaledVector(new THREE.Vector3(-0.35, 0.6, 0.75).normalize(), Math.max(6, Math.hypot(x1 - x0, z1 - z0) * 1.3)));
 }
 function irParaEscada() {
   if (!D.escada) return;
@@ -980,7 +996,7 @@ qNum.addEventListener("input", () => {
     else if (/^esc/i.test(v)) irParaEscada();
     else if (/^(chuv|lava)/i.test(v)) irParaLavaOlhos();
     else if (/^mesa/i.test(v)) irParaMesa();
-    else if (/^empi/i.test(v)) irParaEmpilhadeira();
+    else if (/^empi/i.test(v)) irParaEmpilhadeiras();
   }, 350);
 });
 qNum.addEventListener("keydown", (e) => {
@@ -991,7 +1007,7 @@ qNum.addEventListener("keydown", (e) => {
   else if (/^esc/i.test(qNum.value.trim())) irParaEscada();
   else if (/^(chuv|lava)/i.test(qNum.value.trim())) irParaLavaOlhos();
   else if (/^mesa/i.test(qNum.value.trim())) irParaMesa();
-  else if (/^empi/i.test(qNum.value.trim())) irParaEmpilhadeira();
+  else if (/^empi/i.test(qNum.value.trim())) irParaEmpilhadeiras();
 });
 
 // ── Busca por produto ───────────────────────────────────────────────────────
@@ -1048,13 +1064,13 @@ function verHover() {
   tip.textContent = "";
   const t = (tag, txt, cls) => { const el = document.createElement(tag); el.textContent = txt; if (cls) el.className = cls; tip.appendChild(el); return el; };
   if (ud.empilhadeira) {
-    const E = D.empilhadeira, cx = empilhadeira.caixa, m2 = (v) => v.toFixed(2).replace(".", ",");
-    t("b", "Empilhadeira patolada");
-    t("div", `Referência · em frente à mesa de expedição, na ponta da Rua ${E.rua}`, "s");
+    const emp = empilhadeiras[ud.empilhadeira - 1], E = emp.d, cx = emp.caixa, m2 = (v) => v.toFixed(2).replace(".", ",");
+    t("b", E.nome);
+    t("div", `Referência · ${E.onde}`, "s");
     t("div", `${m2(E.comprimento)} × ${m2(E.largura)} m · altura ${m2(E.altura)} m`, "s");
     t("div", "Modelo 3D: NVIDIA SimReady (CC BY 4.0)", "s");
     hoverBox.scale.set(cx.w + 0.06, cx.h + 0.06, cx.d + 0.06);
-    hoverBox.position.set(cx.x, cx.h / 2, cx.z);
+    hoverBox.position.set(cx.x, cx.y + cx.h / 2, cx.z);
   } else if (ud.mesa) {
     const Ms = D.mesa, cx = mesa.caixa, m2 = (v) => v.toFixed(2).replace(".", ",");
     t("b", "Mesa de expedição");
@@ -1198,7 +1214,7 @@ redimensionar();
 refrescar();
 enquadrarVista(false);
 requestAnimationFrame(frame);
-window.__galpao = { state, casas, D, escada, lavaolhos, mesa, empilhadeira, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
+window.__galpao = { state, casas, D, escada, lavaolhos, mesa, empilhadeiras, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
 /*__UI_JS__*/
 </script>
 </body>

@@ -229,7 +229,8 @@ def montar(
         "escada": g.escada(),
         "lavaolhos": g.lava_olhos(),
         "mesa": g.mesa(),
-        "empilhadeira": g.empilhadeira(),
+        "empilhadeiras": [g.empilhadeira(), g.contrabalancada()],
+        "corredor": g.corredor(),
     }
 
 

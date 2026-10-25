@@ -50,7 +50,11 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   antes da rampa. É o modelo
   `vehicle_forklift_orange_a01` da NVIDIA SimReady convertido para `.glb` (`static/modelos/`, CC BY 4.0, ver
   `CREDITOS.md`), servido pelo `enableStaticServing` do Streamlit em `app/static/`. Digite `empilhadeira` no campo Nº
-  para ir até ela. Posição e folgas estão em `galpao.py`; para trocar o modelo, `EMPILHADEIRA_MODELO` e as medidas ao lado.
+  para ir até as empilhadeiras. Posição e folgas estão em `galpao.py`; para trocar o modelo, `EMPILHADEIRA_MODELO` e as medidas ao lado.
+- **Corredor de carregamento e contrabalançada (referência, modelo 3D):** na frente aberta do Galpão 2, depois da rampa,
+  uma faixa de piso de 5 m no nível de baixo da rampa (0,18 m abaixo do galpão), com a largura da laje. No meio dela, a
+  empilhadeira contrabalançada vermelha (`vehicle_forklift_red_c01`, NVIDIA SimReady, 3,74 × 1,36 m), paralela à frente
+  e com o garfo para o lado da mesa. Profundidade, queda e posição estão em `galpao.py` (`corredor()`, `contrabalancada()`).
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
   Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 44 × 4), Barracão (gaiolas ÷ 100 paletes × 4) e Loja
   (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do
