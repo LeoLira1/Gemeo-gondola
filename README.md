@@ -7,6 +7,16 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 `lib/codigos_vinculados.dart`. Se a planta mudar lá, atualize `galpao.py`.
 
 - **Galpão:** 138 posições, pilhas de racks, cor por saldo (vermelho/azul), busca por número e produto.
+- **Rack 3D:** cada nível da pilha é um rack metálico empilhável (`rack3d.js`): palete PBR, 4 montantes com furos e
+  ponteira, travessas redondas em 4 níveis com chapa nos cantos e 45 caixas 5L × 4 (3 × 3 × 5), do desenho técnico,
+  reescalado para a vaga de sempre (pegada da posição, altura = `PASSO_NIVEL`). A cor de saldo/busca vai na fita e na
+  etiqueta das caixas; estrutura sempre metálica, palete sempre madeira. InstancedMesh por rua + LOD (de perto, até 32
+  racks completos; de longe, bloco texturizado + moldura). O botão ▥/◼ volta aos cubos antigos (fica salvo no aparelho).
+- **Rack 3D:** cada nível da pilha é um rack metálico empilhável (`rack3d.js`): palete PBR, 4 montantes com furos e
+  ponteira, travessas redondas em 4 níveis com chapa nos cantos e 45 caixas 5L × 4 (3 × 3 × 5) do desenho técnico,
+  reescalado para a vaga de sempre (pegada da posição, altura = `PASSO_NIVEL`). A cor de saldo/busca vai na fita e na
+  etiqueta das caixas; estrutura sempre metálica, palete sempre madeira. InstancedMesh por rua + LOD (de perto, até 32
+  racks completos; de longe, bloco texturizado + moldura). O botão ▥/◼ volta aos cubos antigos (fica salvo no aparelho).
 - **Gaiolas no fim dos corredores (Parte 2):** no fundo de cada um dos 3 corredores (lado do 86) ficam 3 gaiolas lado a
   lado, de uma fileira à outra: Rua 13 (130–132) entre a R12 e a R11, Rua 14 (133–135) entre a R11 e a R10 e Rua 15
   (136–138) entre a R10 e a R9, numeradas da esquerda para a direita. São racks como os outros (empilham até 4, aceitam
@@ -97,6 +107,8 @@ Testes da lógica (opcional): `pip install pytest && pytest tests`.
 | `dados.py` | Cliente Turso (HTTP, só leitura), montagem do JSON, dados de exemplo |
 | `galpao.py` | Planta e regras de saldo/códigos vinculados do galpão (porte do Gondolas) |
 | `loja.py` | Planta da loja e produtos por estrutura (porte do Gondolas) |
+| `rack3d.js` | Rack 3D reutilizável (`Rack3D.criarRack`, `Rack3D.RackLote`) usado pelo galpão |
+| `rack3d.js` | Rack 3D reutilizável (`Rack3D.criarRack`, `Rack3D.RackLote`) usado pelo galpão |
 | `ui.css`, `ui.js` | Visual e controles compartilhados pelas cenas (legenda recolhível, botão de rótulos) |
 | `.streamlit/config.toml` | Tema (cores) e barra de ferramentas do Streamlit |
 | `estocados.py` | Produtos estocados: busca, nome do palete, endereços, resumo de ocupação e a regra `EST:` |

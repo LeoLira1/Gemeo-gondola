@@ -47,6 +47,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 #legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 6px; vertical-align: -2px; border: 1px solid rgba(0,0,0,.18); }
 #bLeg { position: absolute; left: 12px; bottom: 12px; }
 #bPiso { position: absolute; right: 12px; bottom: 68px; width: 44px; padding: 0; font-size: 20px; line-height: 1; }
+#bRack { position: absolute; right: 12px; bottom: 120px; width: 44px; padding: 0; font-size: 20px; line-height: 1; }
 #bLeg.on { background: var(--ink); color: #fff; border-color: var(--ink); }
 #stats { position: absolute; right: 12px; bottom: 12px; padding: 10px 14px; color: #5d5a53; font-size: 12px; text-align: right; max-width: calc(100% - 140px); }
 #stats b { color: var(--ink); }

@@ -35,6 +35,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>/*__RACK_JS__*/</script>
 <script>
 "use strict";
 const D = /*__DADOS__*/null;
@@ -87,7 +88,7 @@ const mat = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ col
 const M = {
   branco: mat(0xf4f2ed), verde: mat(0x2e9e4f, { roughness: 0.8 }),
   vermelho: mat(RED), azul: mat(BLUE), violeta: mat(0x8B5CF6), madeira: mat(0xc99d66, { roughness: 1 }),
-  laje: mat(0xf8f6f1, { roughness: 1 }), vaga: new THREE.MeshBasicMaterial({ color: 0xe6e2d9, transparent: true, opacity: 0.45, depthWrite: false }),
+  laje: mat(0xf8f6f1, { roughness: 1 }), oculto: new THREE.MeshBasicMaterial({ visible: false }), vaga: new THREE.MeshBasicMaterial({ color: 0xe6e2d9, transparent: true, opacity: 0.45, depthWrite: false }),
 };
 const lineGris = new THREE.LineBasicMaterial({ color: 0x9a9892 });
 const lineFraca = new THREE.LineBasicMaterial({ color: 0xc9c5bb });
@@ -337,20 +338,20 @@ for (const p of D.posicoes) {
   raiz.add(rect, tile);
 
   const stack = new THREE.Group();
-  const racks = [];
+  const racks = [], paleteVelho = [];         // o palete único sob a pilha é só do modo cubo
   if (niveis > 0) {
     // palete de madeira (tampo + 3 travessas)
     const tampo = new THREE.Mesh(boxGeo(p.sx * 0.97, 0.035, p.sz * 0.97), M.madeira);
     tampo.position.y = PALETE_H - 0.0175;
     tampo.castShadow = tampo.receiveShadow = true;
-    stack.add(tampo);
+    stack.add(tampo); paleteVelho.push(tampo);
     for (const f of [-0.4, 0, 0.4]) {
       const along = p.sx < p.sz;                    // rua de eixo Z: travessas correm em Z
       const t = new THREE.Mesh(
         along ? boxGeo(p.sx * 0.12, PALETE_H - 0.035, p.sz * 0.97) : boxGeo(p.sx * 0.97, PALETE_H - 0.035, p.sz * 0.12), M.madeira);
       t.position.set(along ? f * p.sx * 0.85 : 0, (PALETE_H - 0.035) / 2, along ? 0 : f * p.sz * 0.85);
       t.castShadow = t.receiveShadow = true;
-      stack.add(t);
+      stack.add(t); paleteVelho.push(t);
     }
     for (let i = 0; i < niveis; i++) {
       const r = pilha[i];
@@ -360,6 +361,7 @@ for (const p of D.posicoes) {
       m.userData = { n: p.n, o: r.o, rack: r };
       const borda = new THREE.LineSegments(edgesGeo(p.sx * 0.985, D.geo.alt, p.sz * 0.985), lineBorda);
       m.add(borda);
+      m.userData.borda = borda;
       if (r.it && r.it.length) {
         // Rack misto: duas faixas escuras em volta, a 1/3 e 2/3 da altura — distingue de longe sem tirar a cor.
         for (const f of [-1 / 6, 1 / 6]) {
@@ -379,8 +381,91 @@ for (const p of D.posicoes) {
   stack.add(rotulo);
   raiz.add(stack);
   scene.add(raiz);
-  casas.set(p.n, { p, raiz, stack, rect, tile, racks, rotulo, topo, vazia: niveis === 0 });
+  casas.set(p.n, { p, raiz, stack, rect, tile, racks, paleteVelho, rotulo, topo, vazia: niveis === 0 });
 }
+
+// ── Rack 3D (padrão) ou cubo (fallback, botão ▥/◼) — só visual; escolha salva no localStorage ──
+// No modo rack, cada rack da pilha vira um Rack3D (palete + estrutura metálica + caixas 5L × 4) desenhado na
+// mesma vaga do cubo: pegada da posição e altura de empilhamento = passoNivel (apoia nas ponteiras do de baixo).
+// O cubo de cada nível continua na cena, invisível, como alvo do toque/hover e dono dos dados (userData.rack).
+// A cor de saldo/busca (materialDo) vai para a fita e a etiqueta das caixas. Um RackLote (8 InstancedMesh)
+// por rua; LOD por rack: perto da câmera o modelo completo, longe o bloco texturizado com a moldura.
+const RACK_LOD = { perto: 11, histerese: 1, max: 32 };   // até `max` racks completos, os mais próximos      // metros da câmera ao centro do rack
+const RACK_CAMADAS = 5;                              // 3 × 3 × 5 = 45 caixas por rack (desenho técnico)
+let modoRack = "rack";
+try { if (localStorage.getItem("camda_rack") === "cubo") modoRack = "cubo"; } catch (e) {}
+const rackPorRua = new Map();                        // rua → { parte, lote, itens: [{ m, c, i, perto }] }
+for (const c of casas.values()) {
+  c.racks.forEach((m, i) => {
+    if (!rackPorRua.has(c.p.r)) rackPorRua.set(c.p.r, { parte: c.p.p, itens: [] });
+    rackPorRua.get(c.p.r).itens.push({ m, c, i, perto: false });
+  });
+}
+for (const g of rackPorRua.values()) {
+  g.lote = new Rack3D.RackLote({ capacidade: g.itens.length, L: D.geo.comp * 0.985, P: D.geo.larg * 0.985,
+                                 H: D.geo.passoNivel, camadas: RACK_CAMADAS });
+  scene.add(g.lote.grupo);
+}
+function montarRua(g) {
+  g.lote.limpar();
+  for (const it of g.itens) {
+    const p = it.c.p;
+    g.lote.adicionar(p.x, it.i * D.geo.passoNivel, p.z, p.sz > p.sx ? Math.PI / 2 : 0, { cor: it.m.userData.mat.color, perto: it.perto });
+  }
+  g.lote.fechar();
+}
+// Troca perto/longe dos racks das ruas visíveis; só remonta a rua em que algum rack mudou.
+function atualizarLOD() {
+  if (modoRack !== "rack") return;
+  const cam = camera.position, cands = [];
+  for (const g of rackPorRua.values()) {
+    if (!g.lote.grupo.visible) continue;
+    for (const it of g.itens) {
+      const p = it.c.p, d = Math.hypot(cam.x - p.x, cam.y - (it.i + 0.5) * D.geo.passoNivel, cam.z - p.z);
+      it.quer = d < RACK_LOD.perto + (it.perto ? RACK_LOD.histerese : -RACK_LOD.histerese);
+      if (it.quer) cands.push([d, it]);
+    }
+  }
+  if (cands.length > RACK_LOD.max) {
+    cands.sort((a, b) => a[0] - b[0]);
+    for (let k = RACK_LOD.max; k < cands.length; k++) cands[k][1].quer = false;
+  }
+  for (const g of rackPorRua.values()) {
+    if (!g.lote.grupo.visible) continue;
+    let mudou = false;
+    for (const it of g.itens) if (it.quer !== it.perto) { it.perto = it.quer; mudou = true; }
+    if (mudou) { montarRua(g); dirty = true; }
+  }
+}
+function aplicarModoRack(modo) {
+  modoRack = modo === "cubo" ? "cubo" : "rack";
+  const rack = modoRack === "rack", passo = D.geo.passoNivel;
+  for (const c of casas.values()) {
+    for (const m of c.paleteVelho) m.visible = !rack;
+    c.racks.forEach((m, i) => {
+      // modo rack: o alvo do toque ocupa a vaga inteira do rack (base até a ponteira)
+      m.position.y = rack ? (i + 0.5) * passo : PALETE_H + i * passo + D.geo.alt / 2;
+      m.scale.y = rack ? passo / D.geo.alt : 1;
+      m.userData.borda.visible = !rack;
+    });
+    const n = c.racks.length;
+    c.topo = n ? (rack ? n * passo : PALETE_H + (n - 1) * passo + D.geo.alt) : 0.1;
+    c.rotulo.position.y = c.topo + 0.5;
+  }
+  btnRack.textContent = rack ? "▥" : "◼";
+  btnRack.title = rack ? "Racks 3D com caixas — toque para voltar aos cubos (mais leve)" : "Cubos simples — toque para ver os racks 3D com caixas";
+  btnRack.setAttribute("aria-label", btnRack.title);
+  btnRack.dataset.modo = modoRack;
+  pintar(); atualizarVisibilidade(); atualizarSelecao();
+}
+const btnRack = document.createElement("button");
+btnRack.id = "bRack"; btnRack.className = "btn";
+$("wrap").appendChild(btnRack);
+btnRack.onclick = () => {
+  const novo = modoRack === "rack" ? "cubo" : "rack";
+  try { localStorage.setItem("camda_rack", novo); } catch (e) {}
+  aplicarModoRack(novo);
+};
 
 // Rótulos de rua (R1…R15) na ponta de menor coordenada de cada rua; nas gaiolas do fim dos corredores
 // (R13–R15) as fileiras encostam dos dois lados, então o rótulo vai no meio da trinca, no corredor.
@@ -521,11 +606,15 @@ function materialDo(r) {
 }
 function pintar() {
   for (const c of casas.values()) {
-    for (const m of c.racks) m.material = materialDo(m.userData.rack);
-    const estilo = state.sel === c.p.n ? "s" : (c.racks.some((m) => m.material === M.verde) ? "h" : "n");
+    for (const m of c.racks) {
+      m.userData.mat = materialDo(m.userData.rack);
+      m.material = modoRack === "rack" ? M.oculto : m.userData.mat;      // no modo rack a cor vai na fita das caixas
+    }
+    const estilo = state.sel === c.p.n ? "s" : (c.racks.some((m) => m.userData.mat === M.verde) ? "h" : "n");
     c.rotulo.material.map = labelTex(String(c.p.n), estilo);
     c.rotulo.material.needsUpdate = true;
   }
+  if (modoRack === "rack") for (const g of rackPorRua.values()) montarRua(g);
   dirty = true;
 }
 
@@ -547,6 +636,8 @@ function atualizarVisibilidade() {
       if (c.vazia) alvos.push(c.tile); else alvos.push(...c.racks);
     }
   }
+  for (const [rua, g] of rackPorRua)
+    g.lote.grupo.visible = modoRack === "rack" && g.parte === state.parte && (state.rua === null || rua === state.rua);
   paleteira.visible = state.parte === PALETEIRA.parte;       // cenário: acompanha a parte, não o filtro de rua
   for (const [n, s] of rotulosRua) {
     const r = D.ruas.find((x) => x.n === n);
@@ -924,7 +1015,7 @@ function verHover() {
         t("div", `Sistema ${fmt.format(d.sis)} · endereçado ${fmt.format(d.end)}` + (d.cods.length ? ` · ${d.cods.join(" + ")}` : ""), d.t === "falta" ? "w" : "w az");
       }
     }
-    hoverBox.scale.set(c.p.sx * 0.995 + 0.04, D.geo.alt + 0.04, c.p.sz * 0.995 + 0.04);
+    hoverBox.scale.set(c.p.sx * 0.995 + 0.04, D.geo.alt * o.scale.y + 0.04, c.p.sz * 0.995 + 0.04);
     hoverBox.position.set(c.p.x, o.position.y, c.p.z);
   } else {
     t("b", `${ud.n} · vaga livre`);
@@ -986,6 +1077,7 @@ function frame(now) {
   }
   if (selGrupo.visible) { selFill.material.opacity = 0.28 + 0.14 * Math.sin(now / 280); dirty = true; }
   if (controls.update()) dirty = true;
+  if (dirty) atualizarLOD();
   if (!dirty) return;
   dirty = false;
   renderer.render(scene, camera);
@@ -1023,10 +1115,12 @@ aplicarPiso(modoPiso);
 
 // ── Início ──────────────────────────────────────────────────────────────────
 redimensionar();
+aplicarModoRack(modoRack);
 refrescar();
 enquadrarVista(false);
 requestAnimationFrame(frame);
-window.__galpao = { state, casas, D, escada, lavaolhos, mesa, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
+window.__galpao = { state, casas, D, escada, lavaolhos, mesa, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene,
+  aplicarModoRack, antesDeRender: atualizarLOD, rackPorRua };
 /*__UI_JS__*/
 </script>
 </body>

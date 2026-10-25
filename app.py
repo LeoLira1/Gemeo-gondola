@@ -19,6 +19,7 @@ import dados as dd
 ALTURA_MAPA = 720
 UI_CSS = Path(__file__).with_name("ui.css")
 UI_JS = Path(__file__).with_name("ui.js")
+RACK_JS = Path(__file__).with_name("rack3d.js")
 CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html"),
          "barracao": Path(__file__).with_name("cena_barracao.html")}
 
@@ -96,6 +97,7 @@ def cena_html(dados: dict, mapa: str, indice: list, estocados: dict) -> str:
     html = CENAS[mapa].read_text(encoding="utf-8")
     html = html.replace("/*__UI_CSS__*/", UI_CSS.read_text(encoding="utf-8"), 1)
     html = html.replace("/*__UI_JS__*/", UI_JS.read_text(encoding="utf-8"), 1)
+    html = html.replace("/*__RACK_JS__*/", RACK_JS.read_text(encoding="utf-8"), 1)   # só o galpão usa
     return html.replace("/*__DADOS__*/null", payload, 1)
 
 
