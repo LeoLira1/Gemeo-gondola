@@ -230,6 +230,8 @@ def montar(
         "escada": g.escada(),
         "lavaolhos": g.lava_olhos(),
         "mesa": g.mesa(),
+        "empilhadeiras": [g.empilhadeira(), g.contrabalancada()],
+        "corredor": g.corredor(),
     }
 
 
@@ -261,16 +263,11 @@ def ler_turso(url: str, token: str) -> dict[str, Any]:
 
 
 def _avisos_planta(linhas: list[dict[str, Any]] | None) -> list[str]:
-    """A planta é a do código (como no Gondolas); a tabela é só o espelho."""
+    """A planta é a do código (como no Gondolas); a tabela é só o espelho que o app Gondolas regrava ao abrir o
+    galpão. Contagem ou coordenadas diferentes ali (ex.: 129 linhas antes de algum aparelho rodar o APK com as
+    gaiolas) não mudam nada no mapa, então não viram aviso; só avisa quando a tabela nem pôde ser lida."""
     if linhas is None:
         return ["galpao_posicoes não pôde ser lida; usando a planta do código."]
-    por_num = {r["numero"]: r for r in linhas}
-    if len(por_num) != g.TOTAL_POSICOES:
-        return [f"galpao_posicoes tem {len(por_num)} linhas (esperado {g.TOTAL_POSICOES}); a planta usada é a do código."]
-    for p in g.POSICOES:
-        r = por_num.get(p.numero)
-        if r is None or abs(_num(r["pos_x"]) - p.x) > 0.01 or abs(_num(r["pos_z"]) - p.z) > 0.01:
-            return ["galpao_posicoes difere da planta do código; a planta usada é a do código."]
     return []
 
 
@@ -294,6 +291,8 @@ _PRODUTOS_DEMO = [
     ("830901", "INSETICIDA FASTAC DUO 5L"),
     ("940020", "SAL MINERAL BOVINO 25KG"),
 ]
+# Cores por categoria do Gondolas (TursoService.categoriaCores): o cor_hex que vai para o layout.
+_CORES_DEMO = ["#2e7d4f", "#2c5fb0", "#6b4a2b", "#d9b46a", "#e87722", "#8b1a1a", "#c8a000", "#4a4a8a"]
 
 
 _TERCEIROS_DEMO = [
@@ -360,11 +359,11 @@ def dados_exemplo() -> dict[str, Any]:
 # ── Loja (gôndolas e estantes) ──────────────────────────────────────────────
 
 SQL_GONDOLAS = (
-    "SELECT DISTINCT produto_codigo, produto_nome, gondola_num, andar, pos_x, pos_z "
+    "SELECT DISTINCT produto_codigo, produto_nome, gondola_num, andar, pos_x, pos_z, cor_hex "
     "FROM gondola_layout ORDER BY produto_nome"
 )
 SQL_ESTANTES = (
-    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel, coluna FROM estante_layout "
+    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel, coluna, slot, cor_hex FROM estante_layout "
     f"WHERE estante_num NOT IN ({', '.join(map(str, lj.ESTANTES_REMOVIDAS))}) "
     f"AND NOT (estante_num = {lj.NELLORE} AND nivel = 0) ORDER BY produto_nome"
 )
@@ -396,16 +395,20 @@ def loja_exemplo() -> dict[str, Any]:
             if it["tipo"] == "gondola":
                 face, andar = rnd.randint(1, 6), rnd.randint(0, 2)
                 ang = math.radians(90 - 60 * (face - 1))
+                raio = lj.GONDOLA_PRATELEIRAS[andar][0] * 0.7      # na escala da cena de detalhe do app
                 gond.append({"produto_codigo": cod, "produto_nome": nome, "gondola_num": it["n"],
-                             "andar": andar, "pos_x": math.cos(ang), "pos_z": math.sin(ang)})
+                             "andar": andar, "pos_x": raio * math.cos(ang), "pos_z": raio * math.sin(ang),
+                             "cor_hex": rnd.choice(_CORES_DEMO)})
                 qtd.append({"produto_codigo": cod, "local_tipo": "gondola", "local_num": it["n"],
                             "face_ou_coluna": face, "andar_ou_nivel": andar, "quantidade": q})
             else:
                 nivel = rnd.randint(0, lj.niveis_produto(it["n"]) - 1)
                 num = it["n"] + (rnd.randint(0, 5) if it["kind"] == "parede" else 0)
                 col = rnd.randint(0, lj.PRODUTOS_POR_ESPACO_ILHA - 1) if it["kind"] == "ilha" else 0
+                if it["kind"] not in ("ilha", "mostruario"):
+                    col = rnd.randint(0, 2)
                 est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel,
-                            "coluna": col})
+                            "coluna": col, "slot": rnd.randint(0, 3), "cor_hex": rnd.choice(_CORES_DEMO)})
                 qtd.append({"produto_codigo": cod, "local_tipo": "estante", "local_num": num,
                             "face_ou_coluna": col, "andar_ou_nivel": nivel, "quantidade": q})
     dados = lj.montar(gond, est, qtd)
@@ -419,28 +422,40 @@ SQL_BARRACAO = (
     "SELECT id, rotulo, pos_x, pos_z, produto_codigo, produto_nome, quantidade "
     "FROM barracao_enderecos ORDER BY id"
 )
+# As gaiolas empilhadas (níveis 2 a 4). Consulta à parte: num banco de antes da pilha a tabela
+# não existe, e aí só ela falha (None) — o barracão continua com a gaiola do chão.
+SQL_BARRACAO_GAIOLAS = (
+    "SELECT endereco_id, nivel, produto_codigo, produto_nome, quantidade "
+    "FROM barracao_gaiolas ORDER BY endereco_id, nivel"
+)
 
 
 def ler_barracao(url: str, token: str) -> dict[str, Any]:
-    """Barracão: um palete por linha de barracao_enderecos. Tabela ausente/vazia → layout padrão."""
-    (linhas,) = consultar(url, token, [SQL_BARRACAO])
-    return br.montar(linhas)
+    """Barracão: um palete por linha de barracao_enderecos, com a pilha de gaiolas em cima.
+    Tabela ausente/vazia → layout padrão."""
+    linhas, gaiolas = consultar(url, token, [SQL_BARRACAO, SQL_BARRACAO_GAIOLAS])
+    return br.montar(linhas, gaiolas)
 
 
 def barracao_exemplo() -> dict[str, Any]:
     """Barracão fictício, determinístico, só para ver o mapa sem o banco."""
     rnd = random.Random(35)
-    linhas = []
+    linhas, gaiolas = [], []
     for i, p in enumerate(br.posicoes_padrao()):
         cod, nome = ("", "") if rnd.random() < 0.3 else rnd.choice(_PRODUTOS_DEMO)
         linhas.append({"id": i + 1, "rotulo": p["rot"], "pos_x": p["x"], "pos_z": p["z"],
                        "produto_codigo": cod, "produto_nome": nome, "quantidade": rnd.choice([1, 1, 2, 4]) if cod else 0})
+        if cod:  # pilhas de 1 a 4 gaiolas
+            for nv in range(2, 2 + rnd.choice([0, 0, 1, 2, 3])):
+                c2, n2 = rnd.choice(_PRODUTOS_DEMO)
+                gaiolas.append({"endereco_id": i + 1, "nivel": nv, "produto_codigo": c2,
+                                "produto_nome": n2, "quantidade": rnd.choice([1, 2, 4])})
     i = es.item_de_linha(_TERCEIROS_DEMO[2])  # um estocado no primeiro palete livre
     for l in linhas:
         if not l["produto_codigo"]:
             l.update(produto_codigo=i.codigo_do_palete, produto_nome=i.nome_do_palete, quantidade=i.saldo)
             break
-    return br.montar(linhas)
+    return br.montar(linhas, gaiolas)
 
 
 # ── Busca global: um índice com o produto de cada local, nos três mapas ─────
@@ -462,15 +477,17 @@ def indice_global(galpao: dict[str, Any], loja: dict[str, Any], barracao: dict[s
             if p["c"].strip():
                 out.append({"c": p["c"], "n": p["n"], "a": "loja", "w": it["rot"]})
     for p in barracao["pal"]:
-        if p["c"].strip():
-            out.append({"c": p["c"], "n": p["n"], "a": "barracao", "w": p["rot"]})
+        for g in br.gaiolas_do(p):
+            out.append({"c": g["c"], "n": g["n"], "a": "barracao", "w": br.rotulo_gaiola(p["rot"], g["nv"])})
     return out
 
 
 def estocados_da_cena(linhas, galpao: dict[str, Any], barracao: dict[str, Any]) -> dict[str, Any]:
     """Lista de materiais_terceiros + endereço de cada item (liga o palete pelo nome "PRODUTO · COOPERADO")."""
     racks = [(int(n), r) for n, pilha in galpao["pilhas"].items() for r in pilha]
-    return es.para_cena(linhas, racks, barracao["pal"])
+    gaiolas = [{"rot": br.rotulo_gaiola(p["rot"], g["nv"]), "c": g["c"], "n": g["n"]}
+               for p in barracao["pal"] for g in br.gaiolas_do(p)]
+    return es.para_cena(linhas, racks, gaiolas)
 
 
 def resumo_galpao(galpao: dict[str, Any]) -> str:
@@ -483,7 +500,8 @@ def ler_tudo(url: str, token: str) -> dict[str, Any]:
     """Galpão, loja e barracão numa ida só ao Turso. Um mapa que falha vira dados de exemplo
     (anotado em `erros`), sem derrubar os outros."""
     res = consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO,
-                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO, es.SQL_ESTOCADOS, SQL_ITENS])
+                                 SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO, es.SQL_ESTOCADOS, SQL_ITENS,
+                                 SQL_BARRACAO_GAIOLAS])
     erros: dict[str, str] = {}
     try:
         galpao = _montar_galpao_de(*res[:6], itens=res[11])
@@ -495,7 +513,7 @@ def ler_tudo(url: str, token: str) -> dict[str, Any]:
     else:
         loja = lj.montar(gond, est, qtd or [])
         loja["avisos"] = [] if qtd is not None else ["estoque_localizado não pôde ser lida; as quantidades da loja não aparecem."]
-    barracao = br.montar(barr)
+    barracao = br.montar(barr, res[12] if len(res) > 12 else None)
     return {"galpao": galpao, "loja": loja, "barracao": barracao, "erros": erros,
             "estocados": estocados_da_cena(terc, galpao, barracao)}
 
@@ -536,8 +554,13 @@ def ocupacao_galpao(g_: dict[str, Any]) -> dict[int, dict[str, int]]:
     }
 
 
+def gaiolas_no_barracao(b_: dict[str, Any]) -> int:
+    return sum(len(br.gaiolas_do(p)) for p in b_["pal"])
+
+
 def ocupacao_barracao(b_: dict[str, Any]) -> int:
-    return percentual(sum(1 for p in b_["pal"] if p["c"].strip()), len(b_["pal"]))
+    """Gaiolas ÷ (paletes × gaiolas por pilha) — a mesma conta dos racks do galpão."""
+    return percentual(gaiolas_no_barracao(b_), len(b_["pal"]) * br.GAIOLAS_MAX)
 
 
 def ocupacao_loja(l_: dict[str, Any]) -> dict[str, int]:
@@ -554,10 +577,10 @@ def capacidades(tudo: dict[str, Any]) -> list[dict[str, Any]]:
     for parte, o in ocupacao_galpao(tudo["galpao"]).items():
         out.append({"nome": f"Galpão {parte}", "pct": o["pct"], "cor": "#d8d4ca",
                     "dica": f"Galpão {parte}: {o['racks']} racks de {o['capacidade']} (posições × {tudo['galpao']['geo']['niveisMax']} níveis)"})
-    b = tudo["barracao"]["pal"]
-    cheios = sum(1 for p in b if p["c"].strip())
-    out.append({"nome": "Barracão", "pct": percentual(cheios, len(b)), "cor": "#c99d66",
-                "dica": f"Barracão: {cheios} paletes com bag de {len(b)}"})
+    b = tudo["barracao"]
+    gaiolas, capacidade = gaiolas_no_barracao(b), len(b["pal"]) * br.GAIOLAS_MAX
+    out.append({"nome": "Barracão", "pct": ocupacao_barracao(b), "cor": "#c99d66",
+                "dica": f"Barracão: {gaiolas} gaiolas de {capacidade} (paletes × {br.GAIOLAS_MAX} na pilha)"})
     lj_ = ocupacao_loja(tudo["loja"])
     out.append({"nome": "Loja", "pct": lj_["pct"], "cor": "#4caf50",
                 "dica": f"Loja: {lj_['ocupadas']} de {lj_['total']} faixas de endereço (gôndola: face × andar; estante: nível)"})

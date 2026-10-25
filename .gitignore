@@ -6,3 +6,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+
+# Assets 3D baixados do Hugging Face (pesados, recriar com assets/baixar_simready.py)
+assets/simready/
