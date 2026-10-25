@@ -428,6 +428,30 @@ def test_mesa_vai_no_json_do_galpao():
     assert ddm.dados_exemplo()["mesa"]["gaveteiro"]["gavetas"] == 3
 
 
+# ── Empilhadeira (modelo 3D) ────────────────────────────────────────────────
+
+
+def test_empilhadeira_depois_da_ponta_livre_da_mesa():
+    e, m = g.empilhadeira(), g.mesa()
+    assert (e["parte"], e["rua"]) == (m["parte"], m["rua"])
+    fim = m["z_ini"] + m["sentido"] * m["comprimento_total"]
+    tras = e["z0"] if m["sentido"] > 0 else e["z1"]                         # a traseira fica do lado da mesa
+    assert abs((tras - fim) * m["sentido"] - g.EMPILHADEIRA_FOLGA) < 1e-6    # depois da ponta livre, com folga
+    assert abs((e["z1"] - e["z0"]) - (g.EMPILHADEIRA_TRAS + g.EMPILHADEIRA_FRENTE)) < 1e-6
+    assert m["x_fundo"] in (e["x0"], e["x1"])                                # alinhada à face do rack, como a mesa
+    for q in g.POSICOES:                                                     # não invade nenhum rack
+        assert not (e["x0"] < q.x + q.tamanho_x / 2 and e["x1"] > q.x - q.tamanho_x / 2
+                    and e["z0"] < q.z + q.tamanho_z / 2 and e["z1"] > q.z - q.tamanho_z / 2), q.numero
+
+
+def test_empilhadeira_aponta_para_um_glb_que_existe():
+    from pathlib import Path
+    import dados as ddm
+    e = ddm.dados_exemplo()["empilhadeira"]
+    assert e["modelo"].startswith("app/static/")                             # servido pelo enableStaticServing
+    assert (Path(__file__).resolve().parent.parent / e["modelo"].removeprefix("app/")).is_file()
+
+
 # ── Rack misto (até 5 produtos no mesmo palete, no Gondolas) ───────────────
 
 

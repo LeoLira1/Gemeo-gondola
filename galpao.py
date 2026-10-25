@@ -9,6 +9,7 @@ Sem Streamlit e sem rede, para poder ser testado.
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -330,4 +331,36 @@ def mesa() -> dict:
         "comprimento_total": round(comp_total, 4),
         "gaveteiro": {"largura": GAVETEIRO_LARGURA, "profundidade": GAVETEIRO_PROFUNDIDADE, "altura": GAVETEIRO_ALTURA,
                       "folga": GAVETEIRO_FOLGA, "avanco": GAVETEIRO_AVANCO, "gavetas": 3},
+    }
+
+
+# ── Empilhadeira patolada (referência, modelo 3D) ───────────────────────────
+# Fica estacionada logo depois da ponta livre da mesa de expedição, na mesma faixa (alinhada à face do rack),
+# com o timão virado para a mesa e o garfo apontando para fora da fileira. O modelo é o
+# vehicle_forklift_orange_a01 da NVIDIA SimReady (static/modelos/, CC BY 4.0). No arquivo, o garfo aponta
+# para +Z e a origem fica no chão; as medidas abaixo são as do modelo. A folga até a mesa é estimativa.
+EMPILHADEIRA_MODELO = "app/static/modelos/vehicle_forklift_orange_a01.glb"
+EMPILHADEIRA_LARGURA = 0.82
+EMPILHADEIRA_TRAS = 0.35       # da origem até a traseira (timão)
+EMPILHADEIRA_FRENTE = 1.53     # da origem até a ponta do garfo
+EMPILHADEIRA_ALTURA = 1.97
+EMPILHADEIRA_FOLGA = 0.50      # da ponta livre da mesa até a traseira da empilhadeira
+
+
+def empilhadeira() -> dict:
+    """Posição da empilhadeira (metros): `x`, `z` da origem do modelo, `rot` em torno de Y e a caixa no chão."""
+    m = mesa()
+    sentido = m["sentido"]
+    z_mesa_fim = m["z_ini"] + sentido * m["comprimento_total"]
+    z_tras = z_mesa_fim + sentido * EMPILHADEIRA_FOLGA
+    z = z_tras + sentido * EMPILHADEIRA_TRAS
+    x = m["x_fundo"] + m["frente"] * EMPILHADEIRA_LARGURA / 2
+    zs = sorted((z_tras, z + sentido * EMPILHADEIRA_FRENTE))
+    return {
+        "parte": m["parte"], "rua": m["rua"], "modelo": EMPILHADEIRA_MODELO,
+        "x": round(x, 4), "z": round(z, 4), "rot": 0.0 if sentido > 0 else round(math.pi, 6),
+        "x0": round(x - EMPILHADEIRA_LARGURA / 2, 4), "x1": round(x + EMPILHADEIRA_LARGURA / 2, 4),
+        "z0": round(zs[0], 4), "z1": round(zs[1], 4),
+        "largura": EMPILHADEIRA_LARGURA, "comprimento": EMPILHADEIRA_TRAS + EMPILHADEIRA_FRENTE,
+        "altura": EMPILHADEIRA_ALTURA,
     }

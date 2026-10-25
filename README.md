@@ -38,6 +38,11 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   (0,75 m de altura), com as duas laterais em painel cheio (sem pé de ferro) e painel de fundo, e gaveteiro embaixo do
   tampo (2 gavetas + 1 de pasta) do lado do 119. A frente dá para o corredor da Rua 11. Digite `mesa` no campo Nº para ir até ela. Medidas e
   recuo (0,60 m) estão em `galpao.py`.
+- **Empilhadeira (referência, modelo 3D):** empilhadeira patolada laranja estacionada logo depois da ponta livre da
+  mesa de expedição (folga de 0,50 m), alinhada à face do rack, com o timão virado para a mesa. É o modelo
+  `vehicle_forklift_orange_a01` da NVIDIA SimReady convertido para `.glb` (`static/modelos/`, CC BY 4.0, ver
+  `CREDITOS.md`), servido pelo `enableStaticServing` do Streamlit em `app/static/`. Digite `empilhadeira` no campo Nº
+  para ir até ela. Posição e folga estão em `galpao.py`; para trocar o modelo, `EMPILHADEIRA_MODELO` e as medidas ao lado.
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
   Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 44 × 4), Barracão (paletes com bag ÷ 100) e Loja
   (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do

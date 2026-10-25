@@ -11,7 +11,7 @@
   <div id="top">
     <div class="row">
       <div class="panel seg" id="partes"></div>
-      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129, escada, chuveiro, mesa" autocomplete="off"></div>
+      <div class="panel field"><label for="qNum">Nº</label><input id="qNum" class="num" inputmode="numeric" placeholder="1–129, escada, chuveiro, mesa, empilhadeira" autocomplete="off"></div>
       <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
       <div class="panel chips" id="chips"></div>
       <span id="msg"></span>
@@ -28,6 +28,7 @@
     <span><i style="background:#cfd3d8"></i>Escada p/ mesanino</span>
     <span><i style="background:#1b8a4a"></i>Chuveiro lava-olhos</span>
     <span><i style="background:#cecbc3"></i>Mesa de expedição</span>
+    <span><i style="background:#e8890c"></i>Empilhadeira</span>
   </div>
   <div id="stats" class="panel"></div>
   <div id="tip"></div>
@@ -35,6 +36,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script>
 "use strict";
 const D = /*__DADOS__*/null;
@@ -495,6 +497,33 @@ if (D.mesa) {
   hit.position.set(mesa.caixa.x, mesa.caixa.h / 2, mesa.caixa.z); hit.userData.mesa = true; scene.add(hit); mesa.hit = hit;
 }
 
+// Empilhadeira patolada (referência): modelo 3D da NVIDIA SimReady (.glb, CC BY 4.0), estacionada depois da
+// ponta livre da mesa. O arquivo vem do static serving do Streamlit (`app/static/...`), relativo à página.
+// A cena não usa sRGB na saída: as texturas ficam lineares e as cores do glTF voltam para sRGB, como o resto.
+const empilhadeira = { grupo: new THREE.Group(), d: D.empilhadeira };
+if (D.empilhadeira && THREE.GLTFLoader) {
+  const E = D.empilhadeira;
+  empilhadeira.grupo.position.set(E.x, 0, E.z);
+  empilhadeira.grupo.rotation.y = E.rot;
+  scene.add(empilhadeira.grupo);
+  new THREE.GLTFLoader().load(new URL(E.modelo, document.baseURI).href, (gltf) => {
+    gltf.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = o.receiveShadow = true;
+      for (const m of [].concat(o.material)) {
+        if (m.map) m.map.encoding = THREE.LinearEncoding;
+        else if (m.color) m.color.convertLinearToSRGB();
+        m.needsUpdate = true;
+      }
+    });
+    empilhadeira.grupo.add(gltf.scene);
+    dirty = true;
+  }, undefined, (err) => console.warn("empilhadeira: não carregou o modelo", err));
+  empilhadeira.caixa = { x: (E.x0 + E.x1) / 2, z: (E.z0 + E.z1) / 2, w: E.x1 - E.x0, d: E.z1 - E.z0, h: E.altura };
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(empilhadeira.caixa.w, E.altura, empilhadeira.caixa.d), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.set(empilhadeira.caixa.x, E.altura / 2, empilhadeira.caixa.z); hit.userData.empilhadeira = true; scene.add(hit); empilhadeira.hit = hit;
+}
+
 // Seleção (busca por número) e destaque de hover
 const selGrupo = new THREE.Group();
 const selFill = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: ORANGE, transparent: true, opacity: 0.35, depthWrite: false }));
@@ -565,6 +594,11 @@ function atualizarVisibilidade() {
     mesa.grupo.visible = naParteMesa;
     if (naParteMesa) alvos.push(mesa.hit);
   }
+  if (empilhadeira.hit) {
+    const naParteEmp = state.parte === D.empilhadeira.parte;
+    empilhadeira.grupo.visible = naParteEmp;
+    if (naParteEmp) alvos.push(empilhadeira.hit);
+  }
   dirty = true;
 }
 
@@ -587,6 +621,10 @@ function envelope(filtro) {
   if (D.mesa && filtro({ p: D.mesa.parte, r: D.mesa.rua })) {      // a mesa também entra no enquadramento
     a.minX = Math.min(a.minX, D.mesa.x0); a.maxX = Math.max(a.maxX, D.mesa.x1);
     a.minZ = Math.min(a.minZ, D.mesa.z0); a.maxZ = Math.max(a.maxZ, D.mesa.z1);
+  }
+  if (D.empilhadeira && filtro({ p: D.empilhadeira.parte, r: D.empilhadeira.rua })) {      // e a empilhadeira
+    a.minX = Math.min(a.minX, D.empilhadeira.x0); a.maxX = Math.max(a.maxX, D.empilhadeira.x1);
+    a.minZ = Math.min(a.minZ, D.empilhadeira.z0); a.maxZ = Math.max(a.maxZ, D.empilhadeira.z1);
   }
   return a;
 }
@@ -741,6 +779,13 @@ function irParaMesa() {
   const deFrente = new THREE.Vector3(D.mesa.frente * 0.8, 0.5, D.mesa.sentido * 0.45).normalize();   // olha a mesa pela frente
   voarPara(alvo, alvo.clone().addScaledVector(deFrente, 4.2));
 }
+function irParaEmpilhadeira() {
+  if (!empilhadeira.caixa) return;
+  state.sel = null; state.parte = D.empilhadeira.parte; state.rua = null;
+  refrescar();
+  const cx = empilhadeira.caixa, alvo = new THREE.Vector3(cx.x, cx.h / 2, cx.z);
+  voarPara(alvo, alvo.clone().addScaledVector(new THREE.Vector3(0.75, 0.55, 0.4).normalize(), 6));
+}
 function irParaEscada() {
   if (!D.escada) return;
   state.sel = null; state.parte = D.escada.parte; state.rua = null;
@@ -817,6 +862,7 @@ qNum.addEventListener("input", () => {
     else if (/^esc/i.test(v)) irParaEscada();
     else if (/^(chuv|lava)/i.test(v)) irParaLavaOlhos();
     else if (/^mesa/i.test(v)) irParaMesa();
+    else if (/^empi/i.test(v)) irParaEmpilhadeira();
   }, 350);
 });
 qNum.addEventListener("keydown", (e) => {
@@ -827,6 +873,7 @@ qNum.addEventListener("keydown", (e) => {
   else if (/^esc/i.test(qNum.value.trim())) irParaEscada();
   else if (/^(chuv|lava)/i.test(qNum.value.trim())) irParaLavaOlhos();
   else if (/^mesa/i.test(qNum.value.trim())) irParaMesa();
+  else if (/^empi/i.test(qNum.value.trim())) irParaEmpilhadeira();
 });
 
 // ── Busca por produto ───────────────────────────────────────────────────────
@@ -879,10 +926,18 @@ function verHover() {
   const hit = ray.intersectObjects(alvos, false)[0];
   if (!hit) { tip.style.display = "none"; hoverBox.visible = false; canvas.style.cursor = ""; dirty = true; return; }
   const o = hit.object, ud = o.userData, c = casas.get(ud.n);
-  canvas.style.cursor = (ud.escada || ud.lavaolhos || ud.mesa) ? "help" : "pointer";
+  canvas.style.cursor = (ud.escada || ud.lavaolhos || ud.mesa || ud.empilhadeira) ? "help" : "pointer";
   tip.textContent = "";
   const t = (tag, txt, cls) => { const el = document.createElement(tag); el.textContent = txt; if (cls) el.className = cls; tip.appendChild(el); return el; };
-  if (ud.mesa) {
+  if (ud.empilhadeira) {
+    const E = D.empilhadeira, cx = empilhadeira.caixa, m2 = (v) => v.toFixed(2).replace(".", ",");
+    t("b", "Empilhadeira patolada");
+    t("div", `Referência · estacionada depois da mesa de expedição, na ponta da Rua ${E.rua}`, "s");
+    t("div", `${m2(E.comprimento)} × ${m2(E.largura)} m · altura ${m2(E.altura)} m`, "s");
+    t("div", "Modelo 3D: NVIDIA SimReady (CC BY 4.0)", "s");
+    hoverBox.scale.set(cx.w + 0.06, cx.h + 0.06, cx.d + 0.06);
+    hoverBox.position.set(cx.x, cx.h / 2, cx.z);
+  } else if (ud.mesa) {
     const Ms = D.mesa, cx = mesa.caixa, m2 = (v) => v.toFixed(2).replace(".", ",");
     t("b", "Mesa de expedição");
     t("div", `Referência · na ponta da Rua ${Ms.rua}, além do nº ${Ms.ref}`, "s");
@@ -1024,7 +1079,7 @@ redimensionar();
 refrescar();
 enquadrarVista(false);
 requestAnimationFrame(frame);
-window.__galpao = { state, casas, D, escada, lavaolhos, mesa, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
+window.__galpao = { state, casas, D, escada, lavaolhos, mesa, empilhadeira, irParte, irParaPosicao, aplicarBuscaProduto, camera, controls, renderer, scene };
 /*__UI_JS__*/
 </script>
 </body>
