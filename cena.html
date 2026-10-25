@@ -129,9 +129,8 @@ const cimentoTex = (() => {
   return t;
 })();
 
-// Laje do chão (uma só, redimensionada por parte)
-const laje = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, 1), M.laje);
-laje.receiveShadow = true;
+// Laje do chão (refeita por parte)
+const laje = new THREE.Group();   // blocos refeitos por ajustarLaje (a rampa do Galpão 2 abre um rebaixo na frente)
 scene.add(laje);
 
 // ── Paleteira manual (transpalete hidráulica) — peça estática de cenário, em metros ─────────────
@@ -414,11 +413,13 @@ if (D.escada) {
   for (const x of [E.x0 + 0.05, E.x1 - 0.05]) caixaE(x - 0.04, x + 0.04, 0, H - 0.1, E.z1 - sent * 0.06, E.z1 - sent * 0.14, corLat);   // pés do patamar
   // corrimão no lado aberto (o do corredor): postes + barra inclinada que segue os degraus
   const xr = E.lado > 0 ? E.x0 + 0.03 : E.x1 - 0.03, hr = 0.95;
-  for (let i = 0; i <= n; i += 3) caixaE(xr - 0.02, xr + 0.02, (Math.min(i + 1, n) * H) / (n + 1), (Math.min(i + 1, n) * H) / (n + 1) + hr, zDe(i) - 0.02, zDe(i) + 0.02, corLat);
+  for (let i = 0; i < n; i += 3) caixaE(xr - 0.02, xr + 0.02, ((i + 1) * H) / (n + 1), ((i + 1) * H) / (n + 1) + hr, zDe(i) - 0.02, zDe(i) + 0.02, corLat);
+  caixaE(xr - 0.02, xr + 0.02, H - 0.1, H + hr, zDe(n) - 0.02, zDe(n) + 0.02, corLat);                                                     // poste na quebra entre a escada e o patamar
   const dz = (n * run) * sent, dy = H - H / (n + 1), len = Math.hypot(dz, dy);
   const rail = new THREE.Mesh(boxGeo(0.05, 0.05, len), mat(corLat));
   rail.position.set(xr, H / (n + 1) + hr + dy / 2, E.z0 + dz / 2); rail.rotation.x = -Math.atan2(dy, Math.abs(dz)) * sent;
   rail.castShadow = true; rail.userData.escada = true; escada.grupo.add(rail); escada.malhas.push(rail);
+  caixaE(xr - 0.025, xr + 0.025, H + hr - 0.05, H + hr, zDe(n), E.z1 - sent * 0.01, corLat);                                   // corrimão reto sobre o patamar, fechando o da escada
   caixaE(xr - 0.02, xr + 0.02, H, H + hr, E.z1 - sent * 0.03, E.z1 - sent * 0.03 + sent * 0.04, corLat);                                    // poste do patamar
   scene.add(escada.grupo);
   escada.caixa = { x: (E.x0 + E.x1) / 2, z: (E.z0 + E.z1) / 2, w: E.x1 - E.x0, d: L, h: H };
@@ -628,12 +629,129 @@ function envelope(filtro) {
   }
   return a;
 }
+// Paredes do galpão: fecham o perímetro da laje. Cada painel é uma face única virada para dentro: vista de fora, a parede
+// mais próxima da câmera some e não tapa os racks (a frente do Galpão 1 deixa um "fantasma" translúcido para ver o vão).
+// Galpão 1: a frente (Z+) é fechada, com um vão (medidas em metros, na planta dos racks, centrado na paleteira).
+// Galpão 2: a frente (Z+, lado da mesa) é toda aberta.
+const PAREDES = { altura: { 1: 6.0, 2: 5.0 }, margem: 0.7, frente: { 1: { vao: [2.4, 6.8] }, 2: null } };
+const paredes = new THREE.Group();
+const matParede = new THREE.MeshStandardMaterial({ color: 0xdad4c9, roughness: 1, metalness: 0, side: THREE.FrontSide });
+// Texturas (ambientCG, CC0): reboco cru nas paredes (Plaster002) e cimento no piso (Concrete034).
+// As imagens vêm embutidas (data URI) pelo app.py; sem elas, ficam a cor lisa e o cimento procedural.
+const TEXTURAS = /*__TEXTURAS__*/null;
+const TAM_TEX_PAREDE = 2.2, TAM_TEX_PISO = 4.5;   // um bloco de textura a cada ~2,2 m (parede) e ~4,5 m (piso)
+const carregarTex = (url, extra) => new THREE.TextureLoader().load(url, (t) => {
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; Object.assign(t, extra);
+  M.laje.needsUpdate = matParede.needsUpdate = true; dirty = true;
+});
+const pisoMapa = TEXTURAS ? carregarTex(TEXTURAS.piso.cor) : cimentoTex;
+const pisoNormal = TEXTURAS ? carregarTex(TEXTURAS.piso.normal) : null;
+if (TEXTURAS) {
+  matParede.map = carregarTex(TEXTURAS.parede.cor);
+  matParede.normalMap = carregarTex(TEXTURAS.parede.normal);
+  matParede.normalScale.set(0.9, 0.9);
+}
+scene.add(paredes);
+// Porta metálica laminada (veneziana) no fim da escada, na parede do lado dela, na altura do patamar.
+const PORTA = { largura: 0.90, altura: 2.10, batente: 0.06 };
+function portaVeneziana(xParede, lado, zCentro, yBase) {
+  const { largura: W, altura: A, batente: B } = PORTA, g = new THREE.Group();
+  const caixa = (w, h, d, x, y, z, m, rx = 0) => {
+    const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.x = rx; g.add(o); return o;
+  };
+  const claro = mat(0xf3f2ee), grafite = mat(0x8e949b, { roughness: 0.5, metalness: 0.45 });
+  const ripa = mat(0xd2d6db, { roughness: 0.45, metalness: 0.5 }), inox = mat(0xb9bdc3, { roughness: 0.35, metalness: 0.6 });
+  caixa(B, A, 0.07, -(W + B) / 2, A / 2, 0.035, claro); caixa(B, A, 0.07, (W + B) / 2, A / 2, 0.035, claro);   // batente
+  caixa(W + 2 * B, B, 0.07, 0, A + B / 2, 0.035, claro);
+  caixa(W, A, 0.03, 0, A / 2, 0.02, grafite);                                                                 // folha
+  const passo = 0.062, n = Math.floor((A - 0.16) / passo);
+  for (let i = 0; i < n; i++) caixa(W - 0.1, 0.034, 0.03, 0, 0.1 + i * passo + 0.02, 0.05, ripa, -0.6);        // venezianas
+  caixa(0.04, 0.2, 0.012, -W / 2 + 0.08, 1.0, 0.045, inox);                                                   // espelho da fechadura
+  caixa(0.11, 0.025, 0.03, -W / 2 + 0.13, 1.0, 0.075, inox);                                                  // maçaneta
+  g.position.set(xParede - lado * 0.005, yBase, zCentro);
+  g.rotation.y = lado > 0 ? -Math.PI / 2 : Math.PI / 2;                                                       // frente para dentro do galpão
+  return g;
+}
+const matFantasma = new THREE.MeshBasicMaterial({ color: 0xa89f90, transparent: true, opacity: 0.28, side: THREE.BackSide, depthWrite: false });
+function montarParedes(x0, x1, z0, z1) {
+  paredes.clear();
+  const H = PAREDES.altura[state.parte] || 5.0, frente = PAREDES.frente[state.parte];
+  // [x de, x até, z de, z até, giro Y, fantasma]: a normal do plano (+Z) é girada para apontar ao centro do galpão
+  const lados = [
+    [x0, x1, z0, z0, 0],                                         // fundo (Z−)
+    [x0, x0, z0, z1, Math.PI / 2],                               // ponta X−
+    [x1, x1, z0, z1, -Math.PI / 2],                              // ponta X+
+  ];
+  if (frente) {                                                  // frente (Z+) com vão
+    const [va, vb] = frente.vao;
+    lados.push([x0, va, z1, z1, Math.PI, true], [vb, x1, z1, z1, Math.PI, true]);
+  }
+  for (const [xa, xb, za, zb, ry, fantasma] of lados) {
+    const len = Math.hypot(xb - xa, zb - za);
+    const geo = new THREE.PlaneGeometry(len, H);
+    const uv = geo.attributes.uv;                   // textura em escala real: repete a cada TAM_TEX_PAREDE metros
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * len / TAM_TEX_PAREDE, uv.getY(i) * H / TAM_TEX_PAREDE);
+    for (const mat of fantasma ? [matParede, matFantasma] : [matParede]) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set((xa + xb) / 2, H / 2, (za + zb) / 2); m.rotation.y = ry; m.receiveShadow = mat === matParede;
+      paredes.add(m);
+    }
+  }
+  const E = D.escada;
+  if (E && E.parte === state.parte) paredes.add(portaVeneziana(E.lado > 0 ? x1 : x0, E.lado, E.z1 - E.sentido * E.patamar / 2, E.altura));
+  paredes.visible = true;
+}
+// Rampa do Galpão 2: na frente aberta, pequeno declive que desce até o corredor de carregamento (metros, mesma planta dos racks).
+// O trecho à direita dela e o da esquerda (mesa) ficam no nível do piso.
+const RAMPA = { parte: 2, x0: 17.5, x1: 28.7, prof: 1.5, queda: 0.18 };
+const ESPESSURA_LAJE = 0.2;
+function uvMundo(geo) {                              // textura em escala real: um bloco a cada TAM_TEX_PISO metros
+  const pos = geo.attributes.position, nor = geo.attributes.normal, uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const topo = Math.abs(nor.getY(i)) > 0.5, lado = Math.abs(nor.getX(i)) > 0.5;
+    uv.setXY(i, (topo ? x : lado ? z : x) / TAM_TEX_PISO, (topo ? z : y) / TAM_TEX_PISO);
+  }
+  return geo;
+}
+function blocoLaje(xa, xb, za, zb) {
+  const geo = new THREE.BoxGeometry(xb - xa, ESPESSURA_LAJE, zb - za);
+  geo.translate((xa + xb) / 2, -ESPESSURA_LAJE / 2, (za + zb) / 2);
+  const m = new THREE.Mesh(uvMundo(geo), M.laje); m.receiveShadow = true; laje.add(m);
+}
+function montarLaje(x0, x1, z0, z1) {
+  for (const m of laje.children) m.geometry.dispose();
+  laje.clear();
+  if (state.parte !== RAMPA.parte) { blocoLaje(x0, x1, z0, z1); return; }
+  const { x0: xa, x1: xb, prof, queda } = RAMPA, zs = z1 - prof, y1 = -ESPESSURA_LAJE;
+  blocoLaje(x0, x1, z0, zs);                         // laje principal, até onde começa o declive
+  blocoLaje(x0, xa, zs, z1);                         // trecho da mesa: nível do piso
+  blocoLaje(xb, x1, zs, z1);                         // trecho à direita: nível do piso
+  // cunha do declive: sobe no piso (y 0) em zs e desce `queda` até z1
+  const v = [[xa, 0, zs], [xb, 0, zs], [xb, -queda, z1], [xa, -queda, z1], [xa, y1, z1], [xb, y1, z1]];
+  const quad = (a, b, c, d) => [a, b, c, a, c, d];
+  const idx = [...quad(0, 3, 2, 1), ...quad(3, 4, 5, 2)];   // rampa (normal para cima) e face da frente
+  const pos = [], uv = [];
+  for (const i of idx) { const [x, y, z] = v[i]; pos.push(x, y, z); uv.push(x / TAM_TEX_PISO, z / TAM_TEX_PISO); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+  geo.computeVertexNormals();
+  const rampa = new THREE.Mesh(geo, M.laje); rampa.receiveShadow = true; laje.add(rampa);
+}
 function ajustarLaje() {
   const e = envelope((p) => p.p === state.parte);
-  const margem = 2.6;
-  laje.scale.set(e.maxX - e.minX + margem * 2, 1, e.maxZ - e.minZ + margem * 2);
-  laje.position.set((e.minX + e.maxX) / 2, -0.1, (e.minZ + e.maxZ) / 2);
-  cimentoTex.repeat.set(laje.scale.x / 3, laje.scale.z / 3);          // um "bloco" de textura a cada ~3 m
+  // Paredes a ~70 cm dos paletes (e da escada, do lava-olhos e da mesa, que entram no envelope). No Galpão 2 a frente é
+  // aberta e a laje e as pontas terminam na linha da mesa.
+  const naMesa = D.mesa && state.parte === D.mesa.parte;
+  const margem = PAREDES.margem;
+  let x0 = e.minX - margem, x1 = e.maxX + margem;
+  const z0 = e.minZ - margem, z1 = naMesa ? D.mesa.z1 : e.maxZ + margem;
+  if (D.escada && D.escada.parte === state.parte) {      // a parede do lado da escada encosta nela
+    if (D.escada.lado > 0) x1 = D.escada.x1 + 0.01; else x0 = D.escada.x0 - 0.01;
+  }
+  montarParedes(x0, x1, z0, z1);
+  montarLaje(x0, x1, z0, z1);
   const R = Math.hypot(e.maxX - e.minX, e.maxZ - e.minZ) / 2 + 4;
   const cx = (e.minX + e.maxX) / 2, cz = (e.minZ + e.maxZ) / 2;
   sun.target.position.set(cx, 0, cz);
@@ -662,7 +780,7 @@ function projetar(alvo, dist, cantos) {
 function enquadrar(filtro, animar = true) {
   const e = envelope(filtro);
   const cantos = [];
-  for (const x of [e.minX, e.maxX]) for (const z of [e.minZ, e.maxZ]) for (const y of [0, 5.4]) cantos.push(new THREE.Vector3(x, y, z));
+  for (const x of [e.minX, e.maxX]) for (const z of [e.minZ, e.maxZ]) for (const y of [0, Math.max(5.4, PAREDES.altura[state.parte] || 0)]) cantos.push(new THREE.Vector3(x, y, z));
   const alvo = new THREE.Vector3((e.minX + e.maxX) / 2, 0.8, (e.minZ + e.maxZ) / 2);
   const frente = new THREE.Vector3(-DIR.x, 0, -DIR.z).normalize();    // "para cima" da tela, no chão
   const sinEl = DIR.y, tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
@@ -1046,8 +1164,8 @@ function frame(now) {
 
 // ── Piso: "cimento" (padrão) ou "branco" — só visual, escolha salva no localStorage ──
 const PISO = {
-  cimento: { cor: 0xc9c9c6, mapa: cimentoTex, hemi: 0.7, sol: 0.62, vagaCor: 0xf1efe9, vagaOp: 0.7, linha: 0x55544f, fraca: 0x9b9a95, borda: 0x8a8984 },
-  branco: { cor: 0xf8f6f1, mapa: null, hemi: 0.74, sol: 0.54, vagaCor: 0xe6e2d9, vagaOp: 0.45, linha: 0x9a9892, fraca: 0xc9c5bb, borda: 0xcfcbc1 },
+  cimento: { parede: 0xdad4c9, cor: TEXTURAS ? 0xfafaf8 : 0xc9c9c6, mapa: pisoMapa, normal: pisoNormal, hemi: 0.7, sol: 0.62, vagaCor: 0xf1efe9, vagaOp: 0.7, linha: 0x55544f, fraca: 0x9b9a95, borda: 0x8a8984 },
+  branco: { parede: 0xf0ece4, cor: 0xf8f6f1, mapa: null, hemi: 0.74, sol: 0.54, vagaCor: 0xe6e2d9, vagaOp: 0.45, linha: 0x9a9892, fraca: 0xc9c5bb, borda: 0xcfcbc1 },
 };
 const luzHemi = scene.children.find((o) => o.isHemisphereLight);
 const btnPiso = document.createElement("button");
@@ -1055,7 +1173,8 @@ btnPiso.id = "bPiso"; btnPiso.className = "btn";
 $("wrap").appendChild(btnPiso);
 function aplicarPiso(modo) {
   const p = PISO[modo] || PISO.cimento;
-  M.laje.color.setHex(p.cor); M.laje.map = p.mapa; M.laje.roughness = 1; M.laje.metalness = 0; M.laje.needsUpdate = true;
+  matParede.color.setHex(p.parede);
+  M.laje.color.setHex(p.cor); M.laje.map = p.mapa; M.laje.normalMap = p.normal || null; M.laje.roughness = 1; M.laje.metalness = 0; M.laje.needsUpdate = true;
   luzHemi.intensity = p.hemi; sun.intensity = p.sol;
   M.vaga.color.setHex(p.vagaCor); M.vaga.opacity = p.vagaOp;
   lineGris.color.setHex(p.linha); lineFraca.color.setHex(p.fraca); lineBorda.color.setHex(p.borda);
