@@ -9,6 +9,7 @@ Sem Streamlit e sem rede, para poder ser testado.
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -330,4 +331,39 @@ def mesa() -> dict:
         "comprimento_total": round(comp_total, 4),
         "gaveteiro": {"largura": GAVETEIRO_LARGURA, "profundidade": GAVETEIRO_PROFUNDIDADE, "altura": GAVETEIRO_ALTURA,
                       "folga": GAVETEIRO_FOLGA, "avanco": GAVETEIRO_AVANCO, "gavetas": 3},
+    }
+
+
+# ── Empilhadeira patolada (referência, modelo 3D) ───────────────────────────
+# Fica estacionada em frente à mesa de expedição, no corredor da Rua 11, paralela à mesa: a traseira (timão) junto
+# à ponta livre da mesa, onde o piso termina (frente aberta do Galpão 2), e o garfo apontando para dentro do galpão.
+# Fica no trecho plano, antes da rampa (RAMPA.x0 = 17,5 m em cena.html). O modelo é o vehicle_forklift_orange_a01
+# da NVIDIA SimReady (static/modelos/, CC BY 4.0). No arquivo, o garfo aponta para +Z e a origem fica no chão; as
+# medidas abaixo são as do modelo. As folgas são estimativas.
+EMPILHADEIRA_MODELO = "app/static/modelos/vehicle_forklift_orange_a01.glb"
+EMPILHADEIRA_LARGURA = 0.82
+EMPILHADEIRA_TRAS = 0.35       # da origem até a traseira (timão)
+EMPILHADEIRA_FRENTE = 1.53     # da origem até a ponta do garfo
+EMPILHADEIRA_ALTURA = 1.97
+EMPILHADEIRA_FOLGA = 0.30      # da frente da mesa até a lateral da empilhadeira
+EMPILHADEIRA_RECUO = 0.10      # da borda do piso (ponta livre da mesa) até a traseira
+
+
+def empilhadeira() -> dict:
+    """Posição da empilhadeira (metros): `x`, `z` da origem do modelo, `rot` em torno de Y e a caixa no chão."""
+    m = mesa()
+    sentido, frente = m["sentido"], m["frente"]
+    borda = m["z_ini"] + sentido * m["comprimento_total"]          # ponta livre da mesa = fim do piso
+    z_tras = borda - sentido * EMPILHADEIRA_RECUO
+    z = z_tras - sentido * EMPILHADEIRA_TRAS
+    x_frente_mesa = m["x1"] if frente > 0 else m["x0"]
+    x = x_frente_mesa + frente * (EMPILHADEIRA_FOLGA + EMPILHADEIRA_LARGURA / 2)
+    zs = sorted((z_tras, z - sentido * EMPILHADEIRA_FRENTE))
+    return {
+        "parte": m["parte"], "rua": m["rua"], "modelo": EMPILHADEIRA_MODELO,
+        "x": round(x, 4), "z": round(z, 4), "rot": round(math.pi, 6) if sentido > 0 else 0.0,   # garfo para dentro
+        "x0": round(x - EMPILHADEIRA_LARGURA / 2, 4), "x1": round(x + EMPILHADEIRA_LARGURA / 2, 4),
+        "z0": round(zs[0], 4), "z1": round(zs[1], 4),
+        "largura": EMPILHADEIRA_LARGURA, "comprimento": EMPILHADEIRA_TRAS + EMPILHADEIRA_FRENTE,
+        "altura": EMPILHADEIRA_ALTURA,
     }
