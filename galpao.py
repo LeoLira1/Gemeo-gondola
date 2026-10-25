@@ -9,6 +9,7 @@ Sem Streamlit e sem rede, para poder ser testado.
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -288,7 +289,7 @@ def escada() -> dict:
 # desenho. A altura máxima é a de 2 níveis (palete + 2 racks). A distância até o nº 25 é estimativa.
 LAVA_OLHOS_PARTE = 1
 LAVA_OLHOS_REFERENCIA = 25
-LAVA_OLHOS_RECUO = 2.60          # da lateral do nº 25 até o pé do chuveiro
+LAVA_OLHOS_RECUO = 1.20          # da lateral do nº 25 até o pé do chuveiro (mais para dentro, para a parede chegar perto)
 LAVA_OLHOS_NIVEIS = 2
 
 
@@ -344,4 +345,86 @@ def mesa() -> dict:
         "comprimento_total": round(comp_total, 4),
         "gaveteiro": {"largura": GAVETEIRO_LARGURA, "profundidade": GAVETEIRO_PROFUNDIDADE, "altura": GAVETEIRO_ALTURA,
                       "folga": GAVETEIRO_FOLGA, "avanco": GAVETEIRO_AVANCO, "gavetas": 3},
+    }
+
+
+# ── Empilhadeira patolada (referência, modelo 3D) ───────────────────────────
+# Fica estacionada em frente à mesa de expedição, no corredor da Rua 11, paralela à mesa: a traseira (timão) junto
+# à ponta livre da mesa, onde o piso termina (frente aberta do Galpão 2), e o garfo apontando para dentro do galpão.
+# Fica no trecho plano, antes da rampa (RAMPA.x0 = 17,5 m em cena.html). O modelo é o vehicle_forklift_orange_a01
+# da NVIDIA SimReady (static/modelos/, CC BY 4.0). No arquivo, o garfo aponta para +Z e a origem fica no chão; as
+# medidas abaixo são as do modelo. As folgas são estimativas.
+EMPILHADEIRA_MODELO = "app/static/modelos/vehicle_forklift_orange_a01.glb"
+EMPILHADEIRA_LARGURA = 0.82
+EMPILHADEIRA_TRAS = 0.35       # da origem até a traseira (timão)
+EMPILHADEIRA_FRENTE = 1.53     # da origem até a ponta do garfo
+EMPILHADEIRA_ALTURA = 1.97
+EMPILHADEIRA_FOLGA = 0.30      # da frente da mesa até a lateral da empilhadeira
+EMPILHADEIRA_RECUO = 0.10      # da borda do piso (ponta livre da mesa) até a traseira
+
+
+def empilhadeira() -> dict:
+    """Posição da empilhadeira (metros): `x`, `z` da origem do modelo, `rot` em torno de Y e a caixa no chão."""
+    m = mesa()
+    sentido, frente = m["sentido"], m["frente"]
+    borda = m["z_ini"] + sentido * m["comprimento_total"]          # ponta livre da mesa = fim do piso
+    z_tras = borda - sentido * EMPILHADEIRA_RECUO
+    z = z_tras - sentido * EMPILHADEIRA_TRAS
+    x_frente_mesa = m["x1"] if frente > 0 else m["x0"]
+    x = x_frente_mesa + frente * (EMPILHADEIRA_FOLGA + EMPILHADEIRA_LARGURA / 2)
+    zs = sorted((z_tras, z - sentido * EMPILHADEIRA_FRENTE))
+    return {
+        "parte": m["parte"], "rua": m["rua"], "modelo": EMPILHADEIRA_MODELO, "corredor": False,
+        "nome": "Empilhadeira patolada", "onde": f"Em frente à mesa de expedição, na ponta da Rua {m['rua']}",
+        "x": round(x, 4), "z": round(z, 4), "rot": round(math.pi, 6) if sentido > 0 else 0.0,   # garfo para dentro
+        "x0": round(x - EMPILHADEIRA_LARGURA / 2, 4), "x1": round(x + EMPILHADEIRA_LARGURA / 2, 4),
+        "z0": round(zs[0], 4), "z1": round(zs[1], 4),
+        "largura": EMPILHADEIRA_LARGURA, "comprimento": EMPILHADEIRA_TRAS + EMPILHADEIRA_FRENTE,
+        "altura": EMPILHADEIRA_ALTURA,
+    }
+
+
+# ── Corredor de carregamento e empilhadeira contrabalançada (referência, modelo 3D) ──
+# Na frente aberta do Galpão 2, depois da rampa, o corredor de carregamento: uma faixa de piso no nível de baixo da
+# rampa (CORREDOR_QUEDA, que a RAMPA de cena.html usa), com a largura da laje e CORREDOR_PROFUNDIDADE para fora. A contrabalançada
+# (vehicle_forklift_red_c01, NVIDIA SimReady, CC BY 4.0; pintada de amarelo na cena, como a real) fica no meio da faixa, paralela à frente do galpão,
+# com o garfo apontando para o lado da mesa. No arquivo, o garfo aponta para +Z, a traseira (contrapeso) fica em
+# Z = -1,29 m e a ponta do garfo em Z = +2,45 m. Profundidade e deslocamento são estimativas (ajustar aqui).
+CORREDOR_PARTE = 2
+CORREDOR_PROFUNDIDADE = 5.0
+CORREDOR_QUEDA = 0.18          # o corredor fica abaixo do piso do galpão (é o fim da rampa; cena.html lê daqui)
+CONTRABALANCADA_MODELO = "app/static/modelos/vehicle_forklift_red_c01.glb"
+CONTRABALANCADA_LARGURA = 1.36
+CONTRABALANCADA_TRAS = 1.29
+CONTRABALANCADA_FRENTE = 2.45
+CONTRABALANCADA_ALTURA = 2.17
+CONTRABALANCADA_COR = "#f2b300"  # na loja física ela é amarela; o modelo vem vermelho (cor sólida, sem textura)
+CONTRABALANCADA_MATERIAL_COR = "opaque__plastic__red_unique_forklift_c"
+CONTRABALANCADA_DESLOC = 6.5   # da face do rack da mesa (x_fundo) até o centro da empilhadeira, ao longo da frente
+
+
+def corredor() -> dict:
+    """Faixa do corredor de carregamento: começa na borda da laje (ponta livre da mesa) e vai `profundidade` para fora."""
+    m = mesa()
+    return {"parte": CORREDOR_PARTE, "borda": round(m["z_ini"] + m["sentido"] * m["comprimento_total"], 4),
+            "sentido": m["sentido"], "profundidade": CORREDOR_PROFUNDIDADE, "queda": CORREDOR_QUEDA}
+
+
+def contrabalancada() -> dict:
+    """Mesmo formato de `empilhadeira()`; `corredor` = está no piso do corredor (nível de baixo da rampa)."""
+    m, c = mesa(), corredor()
+    cx = m["x_fundo"] + m["frente"] * CONTRABALANCADA_DESLOC
+    cz = c["borda"] + c["sentido"] * CORREDOR_PROFUNDIDADE / 2
+    d = -m["frente"]                                            # garfo para o lado da mesa
+    x = cx - d * (CONTRABALANCADA_FRENTE - CONTRABALANCADA_TRAS) / 2
+    xs = sorted((x + d * CONTRABALANCADA_FRENTE, x - d * CONTRABALANCADA_TRAS))
+    return {
+        "parte": c["parte"], "rua": m["rua"], "modelo": CONTRABALANCADA_MODELO, "corredor": True,
+        "nome": "Empilhadeira contrabalançada", "cores": {CONTRABALANCADA_MATERIAL_COR: CONTRABALANCADA_COR},
+        "onde": "No corredor de carregamento, depois da rampa",
+        "x": round(x, 4), "z": round(cz, 4), "rot": round(d * math.pi / 2, 6),   # garfo (+Z do modelo) vira o eixo X para `d`
+        "x0": round(xs[0], 4), "x1": round(xs[1], 4),
+        "z0": round(cz - CONTRABALANCADA_LARGURA / 2, 4), "z1": round(cz + CONTRABALANCADA_LARGURA / 2, 4),
+        "largura": CONTRABALANCADA_LARGURA, "comprimento": CONTRABALANCADA_TRAS + CONTRABALANCADA_FRENTE,
+        "altura": CONTRABALANCADA_ALTURA,
     }

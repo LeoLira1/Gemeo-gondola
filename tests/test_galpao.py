@@ -294,10 +294,45 @@ def test_montar_barracao_do_banco():
     assert len(br.montar([])["pal"]) == 100                                      # tabela vazia → layout padrão
 
 
+def test_barracao_pilha_de_gaiolas():
+    linhas = [
+        {"id": 1, "rotulo": "BAR-01", "pos_x": 130, "pos_z": 930, "produto_codigo": "A", "produto_nome": "PROD A", "quantidade": 2},
+        {"id": 2, "rotulo": "BAR-02", "pos_x": 265, "pos_z": 930, "produto_codigo": "", "produto_nome": "", "quantidade": 0},
+    ]
+    gaiolas = [
+        {"endereco_id": 1, "nivel": 3, "produto_codigo": "C", "produto_nome": "PROD C", "quantidade": 5},
+        {"endereco_id": 1, "nivel": 2, "produto_codigo": "EST:9", "produto_nome": "X · ANA", "quantidade": 1},
+        {"endereco_id": 2, "nivel": 2, "produto_codigo": "D", "produto_nome": "PROD D", "quantidade": 7},
+    ]
+    d = br.montar(linhas, gaiolas)
+    p1, p2 = d["pal"]
+    assert [(g["nv"], g["c"]) for g in br.gaiolas_do(p1)] == [(1, "A"), (2, "EST:9"), (3, "C")]
+    assert p1["g"][0]["e"] is True                                               # estocado também na gaiola de cima
+    # chão vazio com gaiola em cima: a de baixo vai para o chão
+    assert p2["c"] == "D" and p2["g"] == []
+    assert {c["c"] for c in d["catalogo"]} == {"A", "C", "D", "EST:9"}
+    assert d["gaiolasMax"] == br.GAIOLAS_MAX == 4
+    assert br.rotulo_gaiola("BAR-01", 3) == "BAR-01 · N3" and br.rotulo_gaiola("BAR-01", 1) == "BAR-01"
+    # banco de antes da pilha: sem a tabela de gaiolas, só o chão
+    assert br.montar(linhas, None)["pal"][0]["g"] == []
+
+
+def test_barracao_pilha_na_busca_global_e_na_capacidade():
+    import dados as ddp
+    t = ddp.tudo_exemplo()
+    t["barracao"] = br.montar(
+        [{"id": 1, "rotulo": "BAR-01", "pos_x": 130, "pos_z": 930, "produto_codigo": "A", "produto_nome": "PROD A", "quantidade": 2}],
+        [{"endereco_id": 1, "nivel": 2, "produto_codigo": "B", "produto_nome": "PROD B", "quantidade": 1}])
+    idx = [e for e in ddp.indice_global(t["galpao"], t["loja"], t["barracao"]) if e["a"] == "barracao"]
+    assert [(e["c"], e["w"]) for e in idx] == [("A", "BAR-01"), ("B", "BAR-01 · N2")]
+    assert ddp.ocupacao_barracao(t["barracao"]) == ddp.percentual(2, 4)       # 2 gaiolas de 1 palete × 4
+
+
 def test_barracao_exemplo():
     import dados as ddb
     d = ddb.barracao_exemplo()
     assert len(d["pal"]) == 100 and any(p["c"] for p in d["pal"]) and any(not p["c"] for p in d["pal"])
+    assert any(p["g"] for p in d["pal"]) and all(len(br.gaiolas_do(p)) <= br.GAIOLAS_MAX for p in d["pal"])
 
 
 # ── Busca global ────────────────────────────────────────────────────────────
@@ -441,6 +476,49 @@ def test_mesa_na_ponta_da_rua_12_alem_do_119():
 def test_mesa_vai_no_json_do_galpao():
     import dados as ddm
     assert ddm.dados_exemplo()["mesa"]["gaveteiro"]["gavetas"] == 3
+
+
+# ── Empilhadeira (modelo 3D) ────────────────────────────────────────────────
+
+
+def test_empilhadeira_em_frente_a_mesa_dentro_do_piso():
+    e, m = g.empilhadeira(), g.mesa()
+    assert (e["parte"], e["rua"]) == (m["parte"], m["rua"])
+    borda = m["z_ini"] + m["sentido"] * m["comprimento_total"]               # o piso do Galpão 2 termina na mesa
+    tras = e["z1"] if m["sentido"] > 0 else e["z0"]
+    assert abs((borda - tras) * m["sentido"] - g.EMPILHADEIRA_RECUO) < 1e-6
+    assert abs((e["z1"] - e["z0"]) - (g.EMPILHADEIRA_TRAS + g.EMPILHADEIRA_FRENTE)) < 1e-6
+    lado = e["x0"] - m["x1"] if m["frente"] > 0 else m["x0"] - e["x1"]       # na frente da mesa, com folga
+    assert abs(lado - g.EMPILHADEIRA_FOLGA) < 1e-6
+    assert e["x1"] < 17.5                                                    # antes da rampa (RAMPA.x0 em cena.html)
+    for q in g.POSICOES:                                                     # não invade nenhum rack
+        assert not (e["x0"] < q.x + q.tamanho_x / 2 and e["x1"] > q.x - q.tamanho_x / 2
+                    and e["z0"] < q.z + q.tamanho_z / 2 and e["z1"] > q.z - q.tamanho_z / 2), q.numero
+
+
+def test_empilhadeiras_apontam_para_glb_que_existem():
+    from pathlib import Path
+    import dados as ddm
+    emps = ddm.dados_exemplo()["empilhadeiras"]
+    assert [e["nome"] for e in emps] == ["Empilhadeira patolada", "Empilhadeira contrabalançada"]
+    for e in emps:
+        assert e["modelo"].startswith("app/static/")                         # servido pelo enableStaticServing
+        assert (Path(__file__).resolve().parent.parent / e["modelo"].removeprefix("app/")).is_file()
+
+
+def test_contrabalancada_no_corredor_de_carregamento():
+    e, c, m = g.contrabalancada(), g.corredor(), g.mesa()
+    assert e["corredor"] and e["parte"] == c["parte"] == m["parte"]
+    fora = sorted((c["borda"], c["borda"] + c["sentido"] * c["profundidade"]))
+    assert fora[0] < e["z0"] and e["z1"] < fora[1]                           # inteira dentro da faixa do corredor
+    assert abs((e["x1"] - e["x0"]) - (g.CONTRABALANCADA_TRAS + g.CONTRABALANCADA_FRENTE)) < 1e-6   # paralela à frente
+    ps = [q for q in g.POSICOES if q.parte == c["parte"]]
+    assert min(q.x for q in ps) < e["x0"] and e["x1"] < max(q.x for q in ps)  # dentro da largura do galpão
+    import math
+    garfo = (math.sin(e["rot"]), math.cos(e["rot"]))                          # +Z do modelo depois da rotação
+    assert garfo[0] * m["frente"] < -0.99                                     # garfo para o lado da mesa
+    assert e["cores"] == {g.CONTRABALANCADA_MATERIAL_COR: g.CONTRABALANCADA_COR}   # amarela, como a da loja
+
 
 
 # ── Rack misto (até 5 produtos no mesmo palete, no Gondolas) ───────────────

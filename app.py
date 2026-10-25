@@ -6,6 +6,8 @@ o token nunca chega ao navegador.
 
 from __future__ import annotations
 
+import base64
+import importlib
 import json
 import os
 from datetime import datetime
@@ -14,11 +16,23 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-import dados as dd
+import barracao
+import dados
+import estocados
+import galpao
+import loja
+
+# O Streamlit Cloud troca os arquivos com o app no ar e reroda só o app.py: os módulos já
+# importados ficariam na versão velha (foi o AttributeError de br.gaiolas_do depois de um
+# deploy). Recarrega na ordem das dependências — são módulos pequenos, custa milissegundos.
+for _modulo in (estocados, galpao, loja, barracao, dados):
+    importlib.reload(_modulo)
+br, dd = barracao, dados
 
 ALTURA_MAPA = 720
 UI_CSS = Path(__file__).with_name("ui.css")
 UI_JS = Path(__file__).with_name("ui.js")
+TEXTURAS = Path(__file__).with_name("texturas")
 CENAS = {"galpao": Path(__file__).with_name("cena.html"), "loja": Path(__file__).with_name("cena_loja.html"),
          "barracao": Path(__file__).with_name("cena_barracao.html")}
 
@@ -82,6 +96,19 @@ def carregar() -> tuple[dict, str | None, str | None]:
         return dd.tudo_exemplo(), None, f"erro ao ler o Turso ({type(e).__name__})"
 
 
+def _texturas() -> str:
+    # as cenas rodam num iframe (srcdoc): sem caminho relativo, então as imagens vão embutidas em base64
+    try:
+        uri = {
+            area: {k: "data:image/jpeg;base64," + base64.b64encode((TEXTURAS / f"{arq}_{k}.jpg").read_bytes()).decode()
+                   for k in ("cor", "normal")}
+            for area, arq in (("parede", "reboco"), ("piso", "piso"))
+        }
+    except OSError:
+        return "null"
+    return json.dumps(uri)
+
+
 def cena_html(dados: dict, mapa: str, indice: list, estocados: dict) -> str:
     # a cena recebe o índice global de produtos, qual mapa ela é (busca em todos os mapas)
     # e a lista de estocados (material de cooperado, fora do saldo)
@@ -96,6 +123,7 @@ def cena_html(dados: dict, mapa: str, indice: list, estocados: dict) -> str:
     html = CENAS[mapa].read_text(encoding="utf-8")
     html = html.replace("/*__UI_CSS__*/", UI_CSS.read_text(encoding="utf-8"), 1)
     html = html.replace("/*__UI_JS__*/", UI_JS.read_text(encoding="utf-8"), 1)
+    html = html.replace("/*__TEXTURAS__*/null", _texturas(), 1)
     return html.replace("/*__DADOS__*/null", payload, 1)
 
 
@@ -141,10 +169,12 @@ if mapa == "galpao":
 elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]
+    gaiolas = [g for p in pal for g in br.gaiolas_do(p)]
     chips = [
-        _stat(f"de {len(pal)} paletes com bag", len(ocupados), "#c99d66"),
+        _stat(f"de {len(pal)} paletes ocupados", len(ocupados), "#c99d66"),
+        _stat(f"gaiolas (até {br.GAIOLAS_MAX} por pilha)", len(gaiolas)),
         _stat("livres", len(pal) - len(ocupados)),
-        _stat("unidades", f"{sum(p['q'] for p in ocupados):g}"),
+        _stat("unidades", f"{sum(g['q'] for g in gaiolas):g}"),
         _stat("produtos", len(dados["catalogo"])),
         _stat(f"fileiras · corredor de {dados['corredor']:g} m", dados["fileiras"]),
     ]
