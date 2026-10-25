@@ -498,8 +498,8 @@ if (D.mesa) {
   hit.position.set(mesa.caixa.x, mesa.caixa.h / 2, mesa.caixa.z); hit.userData.mesa = true; scene.add(hit); mesa.hit = hit;
 }
 
-// Empilhadeira patolada (referência): modelo 3D da NVIDIA SimReady (.glb, CC BY 4.0), estacionada depois da
-// ponta livre da mesa. O arquivo vem do static serving do Streamlit (`app/static/...`), relativo à página.
+// Empilhadeira patolada (referência): modelo 3D da NVIDIA SimReady (.glb, CC BY 4.0), estacionada em frente à
+// mesa, no corredor da Rua 11, com o garfo para dentro. O arquivo vem do static serving do Streamlit (`app/static/...`), relativo à página.
 // A cena não usa sRGB na saída: as texturas ficam lineares e as cores do glTF voltam para sRGB, como o resto.
 const empilhadeira = { grupo: new THREE.Group(), d: D.empilhadeira };
 if (D.empilhadeira && THREE.GLTFLoader) {
@@ -1050,7 +1050,7 @@ function verHover() {
   if (ud.empilhadeira) {
     const E = D.empilhadeira, cx = empilhadeira.caixa, m2 = (v) => v.toFixed(2).replace(".", ",");
     t("b", "Empilhadeira patolada");
-    t("div", `Referência · estacionada depois da mesa de expedição, na ponta da Rua ${E.rua}`, "s");
+    t("div", `Referência · em frente à mesa de expedição, na ponta da Rua ${E.rua}`, "s");
     t("div", `${m2(E.comprimento)} × ${m2(E.largura)} m · altura ${m2(E.altura)} m`, "s");
     t("div", "Modelo 3D: NVIDIA SimReady (CC BY 4.0)", "s");
     hoverBox.scale.set(cx.w + 0.06, cx.h + 0.06, cx.d + 0.06);

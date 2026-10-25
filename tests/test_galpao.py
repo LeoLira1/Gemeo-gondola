@@ -466,14 +466,16 @@ def test_mesa_vai_no_json_do_galpao():
 # ── Empilhadeira (modelo 3D) ────────────────────────────────────────────────
 
 
-def test_empilhadeira_depois_da_ponta_livre_da_mesa():
+def test_empilhadeira_em_frente_a_mesa_dentro_do_piso():
     e, m = g.empilhadeira(), g.mesa()
     assert (e["parte"], e["rua"]) == (m["parte"], m["rua"])
-    fim = m["z_ini"] + m["sentido"] * m["comprimento_total"]
-    tras = e["z0"] if m["sentido"] > 0 else e["z1"]                         # a traseira fica do lado da mesa
-    assert abs((tras - fim) * m["sentido"] - g.EMPILHADEIRA_FOLGA) < 1e-6    # depois da ponta livre, com folga
+    borda = m["z_ini"] + m["sentido"] * m["comprimento_total"]               # o piso do Galpão 2 termina na mesa
+    tras = e["z1"] if m["sentido"] > 0 else e["z0"]
+    assert abs((borda - tras) * m["sentido"] - g.EMPILHADEIRA_RECUO) < 1e-6
     assert abs((e["z1"] - e["z0"]) - (g.EMPILHADEIRA_TRAS + g.EMPILHADEIRA_FRENTE)) < 1e-6
-    assert m["x_fundo"] in (e["x0"], e["x1"])                                # alinhada à face do rack, como a mesa
+    lado = e["x0"] - m["x1"] if m["frente"] > 0 else m["x0"] - e["x1"]       # na frente da mesa, com folga
+    assert abs(lado - g.EMPILHADEIRA_FOLGA) < 1e-6
+    assert e["x1"] < 17.5                                                    # antes da rampa (RAMPA.x0 em cena.html)
     for q in g.POSICOES:                                                     # não invade nenhum rack
         assert not (e["x0"] < q.x + q.tamanho_x / 2 and e["x1"] > q.x - q.tamanho_x / 2
                     and e["z0"] < q.z + q.tamanho_z / 2 and e["z1"] > q.z - q.tamanho_z / 2), q.numero
