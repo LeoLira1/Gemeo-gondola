@@ -20,3 +20,6 @@ para WebP, malha simplificada para ~40 mil triângulos. Física, juntas e materi
 Gerado por `assets/converter_simready.sh`.
 
 Extensões glTF usadas: `KHR_mesh_quantization`, `EXT_texture_webp` (o GLTFLoader do three r128 lê as duas).
+
+**Na cena:** a carroceria da `vehicle_forklift_red_c01` é pintada de amarelo (`#f2b300`) em tempo de execução, para
+ficar igual à empilhadeira da loja física (o arquivo .glb continua com a cor original).

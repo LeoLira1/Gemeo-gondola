@@ -373,7 +373,7 @@ def empilhadeira() -> dict:
 # ── Corredor de carregamento e empilhadeira contrabalançada (referência, modelo 3D) ──
 # Na frente aberta do Galpão 2, depois da rampa, o corredor de carregamento: uma faixa de piso no nível de baixo da
 # rampa (CORREDOR_QUEDA, que a RAMPA de cena.html usa), com a largura da laje e CORREDOR_PROFUNDIDADE para fora. A contrabalançada
-# vermelha (vehicle_forklift_red_c01, NVIDIA SimReady, CC BY 4.0) fica no meio da faixa, paralela à frente do galpão,
+# (vehicle_forklift_red_c01, NVIDIA SimReady, CC BY 4.0; pintada de amarelo na cena, como a real) fica no meio da faixa, paralela à frente do galpão,
 # com o garfo apontando para o lado da mesa. No arquivo, o garfo aponta para +Z, a traseira (contrapeso) fica em
 # Z = -1,29 m e a ponta do garfo em Z = +2,45 m. Profundidade e deslocamento são estimativas (ajustar aqui).
 CORREDOR_PARTE = 2
@@ -384,6 +384,8 @@ CONTRABALANCADA_LARGURA = 1.36
 CONTRABALANCADA_TRAS = 1.29
 CONTRABALANCADA_FRENTE = 2.45
 CONTRABALANCADA_ALTURA = 2.17
+CONTRABALANCADA_COR = "#f2b300"  # na loja física ela é amarela; o modelo vem vermelho (cor sólida, sem textura)
+CONTRABALANCADA_MATERIAL_COR = "opaque__plastic__red_unique_forklift_c"
 CONTRABALANCADA_DESLOC = 6.5   # da face do rack da mesa (x_fundo) até o centro da empilhadeira, ao longo da frente
 
 
@@ -404,7 +406,7 @@ def contrabalancada() -> dict:
     xs = sorted((x + d * CONTRABALANCADA_FRENTE, x - d * CONTRABALANCADA_TRAS))
     return {
         "parte": c["parte"], "rua": m["rua"], "modelo": CONTRABALANCADA_MODELO, "corredor": True,
-        "nome": "Empilhadeira contrabalançada",
+        "nome": "Empilhadeira contrabalançada", "cores": {CONTRABALANCADA_MATERIAL_COR: CONTRABALANCADA_COR},
         "onde": "No corredor de carregamento, depois da rampa",
         "x": round(x, 4), "z": round(cz, 4), "rot": round(d * math.pi / 2, 6),   # garfo (+Z do modelo) vira o eixo X para `d`
         "x0": round(xs[0], 4), "x1": round(xs[1], 4),

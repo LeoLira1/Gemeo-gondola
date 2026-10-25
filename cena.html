@@ -515,6 +515,7 @@ const empilhadeiras = (D.empilhadeiras || []).map((E, i) => {
       for (const m of [].concat(o.material)) {
         if (m.map) m.map.encoding = THREE.LinearEncoding;
         else if (m.color) m.color.convertLinearToSRGB();
+        if (E.cores && E.cores[m.name]) m.color.set(E.cores[m.name]);   // cor da empilhadeira real (ex.: amarela)
         m.needsUpdate = true;
       }
     });

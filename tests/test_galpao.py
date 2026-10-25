@@ -502,6 +502,7 @@ def test_contrabalancada_no_corredor_de_carregamento():
     import math
     garfo = (math.sin(e["rot"]), math.cos(e["rot"]))                          # +Z do modelo depois da rotação
     assert garfo[0] * m["frente"] < -0.99                                     # garfo para o lado da mesa
+    assert e["cores"] == {g.CONTRABALANCADA_MATERIAL_COR: g.CONTRABALANCADA_COR}   # amarela, como a da loja
 
 
 
