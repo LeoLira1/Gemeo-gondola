@@ -6,6 +6,7 @@ o token nunca chega ao navegador.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 from datetime import datetime
@@ -99,8 +100,35 @@ def cena_html(dados: dict, mapa: str, indice: list, estocados: dict) -> str:
     return html.replace("/*__DADOS__*/null", payload, 1)
 
 
+def portao_senha() -> None:
+    """Para a página até digitarem a APP_SENHA. Sem a chave configurada, bloqueia tudo (nunca abre sem senha)."""
+    if st.session_state.get("liberado"):
+        return
+    senha = _segredo("APP_SENHA")
+    _, meio, _ = st.columns([1, 1.2, 1])
+    with meio:
+        st.markdown(
+            '<div class="brand"><div class="logo">📦</div><div><h1>CAMDA · Mapas 3D</h1>'
+            "<small>Acesso restrito</small></div></div>",
+            unsafe_allow_html=True,
+        )
+        if not senha:
+            st.error("APP_SENHA não configurada em st.secrets — acesso bloqueado.")
+            st.stop()
+        with st.form("senha"):
+            digitada = st.text_input("Senha", type="password")
+            entrar = st.form_submit_button("Entrar", use_container_width=True)
+        if entrar:
+            if hmac.compare_digest(digitada.encode(), senha.encode()):
+                st.session_state["liberado"] = True
+                st.rerun()
+            st.error("Senha incorreta.")
+    st.stop()
+
+
 # ── Página ──────────────────────────────────────────────────────────────────
-MAPAS = {"Galpão": "galpao", "Loja": "loja", "Barracão": "barracao"}
+portao_senha()
+MAPAS ={"Galpão": "galpao", "Loja": "loja", "Barracão": "barracao"}
 
 c_marca, c_mapa, c_btn = st.columns([3, 4, 1.2], vertical_alignment="center")
 c_marca.markdown(
