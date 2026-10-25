@@ -4,14 +4,29 @@ import galpao as g
 import dados as dd
 
 
-def test_planta_129_posicoes_85_44():
-    assert g.TOTAL_POSICOES == 129
-    assert sorted(p.numero for p in g.POSICOES) == list(range(1, 130))
+def test_planta_138_posicoes_85_53():
+    assert g.TOTAL_POSICOES == 138
+    assert sorted(p.numero for p in g.POSICOES) == list(range(1, 139))
     assert sum(1 for p in g.POSICOES if p.parte == 1) == 85
-    assert sum(1 for p in g.POSICOES if p.parte == 2) == 44
-    assert len(g.RUAS) == 12
-    assert {r.numero for r in g.RUAS if r.parte == 2} == {9, 10, 11, 12}
+    assert sum(1 for p in g.POSICOES if p.parte == 2) == 53          # 44 nas fileiras + 9 gaiolas
+    assert len(g.RUAS) == 15
+    assert {r.numero for r in g.RUAS if r.parte == 2} == {9, 10, 11, 12, 13, 14, 15}
     assert min(p.numero for p in g.POSICOES if p.parte == 2) == 86
+
+
+def test_gaiolas_no_fim_de_cada_corredor_da_parte_2():
+    fileira = {r.numero: r for r in g.RUAS if r.parte == 2 and not r.rack_atravessado}
+    fundo = min(p.z for p in g.POSICOES if p.rua.numero == 12)       # a ponta do 129 / 86
+    for rua, (esq, dir_), primeiro in [(13, (12, 11), 130), (14, (11, 10), 133), (15, (10, 9), 136)]:
+        ps = sorted((p for p in g.POSICOES if p.rua.numero == rua), key=lambda p: p.x)
+        assert [p.numero for p in ps] == [primeiro, primeiro + 1, primeiro + 2]   # da esquerda para a direita
+        borda_esq = fileira[esq].coord_fixa + g.LARGURA_RACK / 2
+        borda_dir = fileira[dir_].coord_fixa - g.LARGURA_RACK / 2
+        for p in ps:
+            assert p.parte == 2 and p.tamanho_x == g.LARGURA_RACK and p.tamanho_z == g.COMPRIMENTO_RACK
+            assert borda_esq < p.x - p.tamanho_x / 2 and p.x + p.tamanho_x / 2 < borda_dir   # cabe no corredor
+            assert math.isclose(p.z, fundo, abs_tol=1e-9)
+        assert math.isclose(ps[1].x - ps[0].x, g.PASSO_GAIOLA, abs_tol=1e-9)
 
 
 def _por_rua(numero_rua):
@@ -85,7 +100,7 @@ def test_montar_json_sem_segredo_e_com_divergencia():
     assert out["divergencia"]["A"]["t"] == "falta"
     assert out["divergencia"]["B"]["t"] == "sobra"
     assert out["pilhas"]["86"][1]["nome"] == "PROD B"          # nome do mestre quando o rack veio sem
-    assert len(out["posicoes"]) == 129
+    assert len(out["posicoes"]) == 138
 
 
 def test_exemplo_tem_todos_os_estados():
@@ -93,7 +108,7 @@ def test_exemplo_tem_todos_os_estados():
     tipos = {v["t"] for v in d["divergencia"].values()}
     assert tipos == {"falta", "sobra"}
     assert any(len(p) == 4 for p in d["pilhas"].values())
-    assert len(d["pilhas"]) < 129
+    assert len(d["pilhas"]) < 138
 
 
 # ── Loja ────────────────────────────────────────────────────────────────────
@@ -309,7 +324,7 @@ def test_ler_tudo_isola_o_mapa_que_falha(monkeypatch):
     monkeypatch.setattr(ddg, "consultar", lambda url, token, sqls: res)
     t = ddg.ler_tudo("http://x", "t")
     assert "galpao" in t["erros"] and "loja" not in t["erros"]
-    assert len(t["galpao"]["posicoes"]) == 129          # exemplo no lugar
+    assert len(t["galpao"]["posicoes"]) == 138          # exemplo no lugar
 
 
 # ── Escada para o mesanino ──────────────────────────────────────────────────
@@ -380,7 +395,7 @@ def test_ocupacao_do_galpao_por_parte():
     oc = ddp.ocupacao_galpao(ddp.montar(linhas, [], {}, []))
     assert set(oc) == {1, 2}
     assert oc[1] == {"racks": 3, "capacidade": 85 * 4, "pct": ddp.percentual(3, 340)}      # Parte 1: 85 posições
-    assert oc[2] == {"racks": 1, "capacidade": 44 * 4, "pct": ddp.percentual(1, 176)}      # Parte 2: 44 posições
+    assert oc[2] == {"racks": 1, "capacidade": 53 * 4, "pct": ddp.percentual(1, 212)}      # Parte 2: 44 + 9 gaiolas
 
 
 def test_ocupacao_da_loja_por_faixas_de_endereco():
