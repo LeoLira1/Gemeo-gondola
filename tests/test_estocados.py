@@ -70,8 +70,8 @@ def test_resumo_de_ocupacao():
 
 def test_resumo_do_galpao_usa_posicoes_vezes_niveis():
     t = dd.tudo_exemplo()["galpao"]
-    assert len(t["posicoes"]) * t["geo"]["niveisMax"] == 516
-    assert dd.resumo_galpao(t).split(" livres")[0] == str(516 - sum(len(p) for p in t["pilhas"].values()))
+    assert len(t["posicoes"]) * t["geo"]["niveisMax"] == 552
+    assert dd.resumo_galpao(t).split(" livres")[0] == str(552 - sum(len(p) for p in t["pilhas"].values()))
 
 
 def test_est_nao_gera_espelho_em_estoque_localizado():
