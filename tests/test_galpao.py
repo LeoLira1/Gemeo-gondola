@@ -562,3 +562,10 @@ def test_exemplo_tem_um_rack_misto():
     d = dd.dados_exemplo()
     mistos = [r for p in d["pilhas"].values() for r in p if r.get("it")]
     assert len(mistos) == 1 and len(mistos[0]["it"]) == 2
+
+
+def test_espelho_desatualizado_de_galpao_posicoes_nao_vira_aviso():
+    # 129 linhas (antes das gaiolas) ou coordenada velha: o mapa usa a planta do código, sem aviso
+    antigas = [{"numero": p.numero, "pos_x": p.x + 1, "pos_z": p.z} for p in g.POSICOES if p.numero <= 129]
+    assert dd._avisos_planta(antigas) == []
+    assert dd._avisos_planta(None) != []

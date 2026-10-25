@@ -263,16 +263,11 @@ def ler_turso(url: str, token: str) -> dict[str, Any]:
 
 
 def _avisos_planta(linhas: list[dict[str, Any]] | None) -> list[str]:
-    """A planta é a do código (como no Gondolas); a tabela é só o espelho."""
+    """A planta é a do código (como no Gondolas); a tabela é só o espelho que o app Gondolas regrava ao abrir o
+    galpão. Contagem ou coordenadas diferentes ali (ex.: 129 linhas antes de algum aparelho rodar o APK com as
+    gaiolas) não mudam nada no mapa, então não viram aviso; só avisa quando a tabela nem pôde ser lida."""
     if linhas is None:
         return ["galpao_posicoes não pôde ser lida; usando a planta do código."]
-    por_num = {r["numero"]: r for r in linhas}
-    if len(por_num) != g.TOTAL_POSICOES:
-        return [f"galpao_posicoes tem {len(por_num)} linhas (esperado {g.TOTAL_POSICOES}); a planta usada é a do código."]
-    for p in g.POSICOES:
-        r = por_num.get(p.numero)
-        if r is None or abs(_num(r["pos_x"]) - p.x) > 0.01 or abs(_num(r["pos_z"]) - p.z) > 0.01:
-            return ["galpao_posicoes difere da planta do código; a planta usada é a do código."]
     return []
 
 
