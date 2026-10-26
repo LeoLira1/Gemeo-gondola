@@ -43,7 +43,7 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   tampo (2 gavetas + 1 de pasta) do lado do 119. A frente dá para o corredor da Rua 11. Digite `mesa` no campo Nº para ir até ela. Medidas e
   recuo (0,60 m) estão em `galpao.py`.
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
-  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (paletes com bag ÷ 100) e Loja
+  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (paletes empilhados ÷ 100 endereços × 3 de altura; cada bag conta um palete, até 3 por endereço) e Loja
   (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do
   galpão mostra a da parte aberta.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token

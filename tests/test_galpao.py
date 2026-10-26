@@ -484,3 +484,19 @@ def test_exemplo_tem_um_rack_misto():
     d = dd.dados_exemplo()
     mistos = [r for p in d["pilhas"].values() for r in p if r.get("it")]
     assert len(mistos) == 1 and len(mistos[0]["it"]) == 2
+
+
+def test_ocupacao_barracao_ate_3_paletes_de_altura():
+    import dados as ddb
+    linhas = [
+        {"id": 1, "rotulo": "BAR-01", "pos_x": 130, "pos_z": 930, "produto_codigo": "A", "produto_nome": "A", "quantidade": 2},
+        {"id": 2, "rotulo": "BAR-02", "pos_x": 265, "pos_z": 930, "produto_codigo": "", "produto_nome": "", "quantidade": 0},
+        {"id": 3, "rotulo": "BAR-03", "pos_x": 400, "pos_z": 930, "produto_codigo": "B", "produto_nome": "B", "quantidade": 5},
+        {"id": 4, "rotulo": "BAR-04", "pos_x": 535, "pos_z": 930, "produto_codigo": "C", "produto_nome": "C", "quantidade": 0},
+    ]
+    b = br.montar(linhas)
+    assert br.ALTURA_MAX_PALETES == 3
+    assert [br.paletes_no_endereco(p) for p in b["pal"]] == [2, 0, 3, 1]     # bags empilhados, no máximo 3
+    assert ddb.ocupacao_barracao(b) == {"paletes": 6, "capacidade": 12, "pct": 50}
+    cap = {c["nome"]: c for c in ddb.capacidades(ddb.tudo_exemplo())}["Barracão"]
+    assert "100 endereços × 3 de altura" in cap["dica"]

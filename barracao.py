@@ -26,6 +26,9 @@ ABERTURAS = (
     ("PORTA", 2300.0, 2500.0, 300.0),
 )
 
+# Empilhamento: pelo pé-direito, cada endereço comporta no máximo 3 paletes de altura
+ALTURA_MAX_PALETES = 3
+
 # Palete de madeira e bag de 1000 kg em cima
 PALETE_X, PALETE_Z, PALETE_H = 120.0, 100.0, 15.0
 BAG_X, BAG_Z, BAG_H = 100.0, 85.0, 130.0
@@ -82,6 +85,18 @@ def posicoes_padrao() -> list[dict[str, Any]]:
         for coluna in range(colunas()):
             lista.append({"rot": rotulo_do_indice(len(lista)), "x": x_da_coluna(coluna), "z": z_da_fileira(fileira)})
     return lista
+
+
+def paletes_no_endereco(p: dict[str, Any]) -> int:
+    """Paletes empilhados num endereço: 0 se livre; senão a quantidade de bags, de 1 até ALTURA_MAX_PALETES."""
+    if not p["c"].strip():
+        return 0
+    return max(1, min(ALTURA_MAX_PALETES, int(round(p.get("q") or 0))))
+
+
+def ocupacao(pal: list[dict[str, Any]]) -> dict[str, int]:
+    """Paletes empilhados ÷ (endereços × ALTURA_MAX_PALETES)."""
+    return {"paletes": sum(paletes_no_endereco(p) for p in pal), "capacidade": len(pal) * ALTURA_MAX_PALETES}
 
 
 def _num(v: Any) -> float:

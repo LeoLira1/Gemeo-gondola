@@ -536,8 +536,10 @@ def ocupacao_galpao(g_: dict[str, Any]) -> dict[int, dict[str, int]]:
     }
 
 
-def ocupacao_barracao(b_: dict[str, Any]) -> int:
-    return percentual(sum(1 for p in b_["pal"] if p["c"].strip()), len(b_["pal"]))
+def ocupacao_barracao(b_: dict[str, Any]) -> dict[str, int]:
+    """Paletes empilhados ÷ (endereços × 3 de altura: o limite do pé-direito do barracão)."""
+    o = br.ocupacao(b_["pal"])
+    return {**o, "pct": percentual(o["paletes"], o["capacidade"])}
 
 
 def ocupacao_loja(l_: dict[str, Any]) -> dict[str, int]:
@@ -554,10 +556,10 @@ def capacidades(tudo: dict[str, Any]) -> list[dict[str, Any]]:
     for parte, o in ocupacao_galpao(tudo["galpao"]).items():
         out.append({"nome": f"Galpão {parte}", "pct": o["pct"], "cor": "#d8d4ca",
                     "dica": f"Galpão {parte}: {o['racks']} racks de {o['capacidade']} (posições × {tudo['galpao']['geo']['niveisMax']} níveis)"})
-    b = tudo["barracao"]["pal"]
-    cheios = sum(1 for p in b if p["c"].strip())
-    out.append({"nome": "Barracão", "pct": percentual(cheios, len(b)), "cor": "#c99d66",
-                "dica": f"Barracão: {cheios} paletes com bag de {len(b)}"})
+    b_ = ocupacao_barracao(tudo["barracao"])
+    out.append({"nome": "Barracão", "pct": b_["pct"], "cor": "#c99d66",
+                "dica": f"Barracão: {b_['paletes']} paletes de {b_['capacidade']} "
+                        f"({len(tudo['barracao']['pal'])} endereços × {br.ALTURA_MAX_PALETES} de altura)"})
     lj_ = ocupacao_loja(tudo["loja"])
     out.append({"nome": "Loja", "pct": lj_["pct"], "cor": "#4caf50",
                 "dica": f"Loja: {lj_['ocupadas']} de {lj_['total']} faixas de endereço (gôndola: face × andar; estante: nível)"})
