@@ -40,7 +40,7 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
   Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
 - **Barracão:** a estrutura de 35 × 10 m (paredes de 6 m, porta, portão e porta na parede da frente) com os paletes
-  de `barracao_enderecos` (BAR-01 … BAR-100), cada um com a pilha de até 4 gaiolas (a do chão em
+  de `barracao_enderecos` (BAR-01 … BAR-100), cada um com a pilha de até 3 gaiolas (o limite do pé-direito) (a do chão em
   `barracao_enderecos`, as de cima em `barracao_gaiolas`). Chips por fileira, busca por `BAR7` e por produto, e botão
   para alternar paredes reais / em corte. Sem linhas na tabela, mostra o layout padrão do Gondolas, todo livre.
 - **Busca global:** o campo de produto de qualquer mapa procura no galpão, na loja e no barracão. O resumo mostra
@@ -67,7 +67,7 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   empilhadeira contrabalançada amarela (`vehicle_forklift_red_c01`, NVIDIA SimReady, 3,74 × 1,36 m; o modelo vem vermelho e a cena pinta a carroceria de amarelo, `CONTRABALANCADA_COR`), paralela à frente
   e com o garfo para o lado da mesa. Profundidade, queda e posição estão em `galpao.py` (`corredor()`, `contrabalancada()`).
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
-  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (gaiolas ÷ 100 paletes × 4) e Loja
+  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (gaiolas ÷ 100 paletes × 3) e Loja
   (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do
   galpão mostra a da parte aberta.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token

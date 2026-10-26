@@ -311,7 +311,7 @@ def test_barracao_pilha_de_gaiolas():
     # chão vazio com gaiola em cima: a de baixo vai para o chão
     assert p2["c"] == "D" and p2["g"] == []
     assert {c["c"] for c in d["catalogo"]} == {"A", "C", "D", "EST:9"}
-    assert d["gaiolasMax"] == br.GAIOLAS_MAX == 4
+    assert d["gaiolasMax"] == br.GAIOLAS_MAX == 3
     assert br.rotulo_gaiola("BAR-01", 3) == "BAR-01 · N3" and br.rotulo_gaiola("BAR-01", 1) == "BAR-01"
     # banco de antes da pilha: sem a tabela de gaiolas, só o chão
     assert br.montar(linhas, None)["pal"][0]["g"] == []
@@ -325,7 +325,7 @@ def test_barracao_pilha_na_busca_global_e_na_capacidade():
         [{"endereco_id": 1, "nivel": 2, "produto_codigo": "B", "produto_nome": "PROD B", "quantidade": 1}])
     idx = [e for e in ddp.indice_global(t["galpao"], t["loja"], t["barracao"]) if e["a"] == "barracao"]
     assert [(e["c"], e["w"]) for e in idx] == [("A", "BAR-01"), ("B", "BAR-01 · N2")]
-    assert ddp.ocupacao_barracao(t["barracao"]) == ddp.percentual(2, 4)       # 2 gaiolas de 1 palete × 4
+    assert ddp.ocupacao_barracao(t["barracao"]) == ddp.percentual(2, 3)       # 2 gaiolas de 1 palete × 3
 
 
 def test_barracao_exemplo():
@@ -569,3 +569,9 @@ def test_espelho_desatualizado_de_galpao_posicoes_nao_vira_aviso():
     antigas = [{"numero": p.numero, "pos_x": p.x + 1, "pos_z": p.z} for p in g.POSICOES if p.numero <= 129]
     assert dd._avisos_planta(antigas) == []
     assert dd._avisos_planta(None) != []
+
+
+def test_barracao_pilha_ate_3_gaiolas():
+    linhas = [{"id": 1, "rotulo": "BAR-01", "pos_x": 130, "pos_z": 930, "produto_codigo": "A", "produto_nome": "A", "quantidade": 1}]
+    gaiolas = [{"endereco_id": 1, "nivel": nv, "produto_codigo": "B", "produto_nome": "B", "quantidade": 1} for nv in (2, 3, 4)]
+    assert len(br.gaiolas_do(br.montar(linhas, gaiolas)["pal"][0])) == 3
