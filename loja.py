@@ -53,6 +53,11 @@ GONDOLA_ESCALA = GONDOLA_R / 3.4
 ALTURA_GONDOLA = (3.43 + 0.26 / 2) * GONDOLA_ESCALA
 ESTANTE_H = 0.85
 
+# Caixa mista (Gondolas, lib/caixa_mista.dart): uma caixa de estante com 2 a 5 produtos. No banco é mais de uma linha
+# de estante_layout no mesmo (estante_num, coluna, nivel, slot), na ordem do id; o nome opcional da caixa fica em
+# estante_layout.caixa_nome (coluna que só existe depois que o app novo abre no banco — por isso o SELECT *).
+PRODUTOS_MAX_POR_CAIXA = 5
+
 # Cada item: (tipo, numero, x, z, w, d). Os 12 primeiros são gôndolas.
 _G = [(12, 3, 4), (7, 5, 4), (5, 7, 4), (11, 3, 6), (4, 7, 6), (10, 3, 8),
       (3, 7, 8), (9, 3, 10), (2, 7, 10), (8, 3, 12), (6, 5, 12), (1, 7, 12)]
@@ -267,12 +272,58 @@ def caixas_estante(r: dict[str, Any]) -> dict[str, Any]:
             "s": max(0, int(r.get("slot") or 0))}
 
 
+def caixas_mistas(estantes: list[dict[str, Any]]) -> dict[tuple[int, int, int, int], dict[str, Any]]:
+    """As caixas com 2 ou mais produtos: (estante, coluna, nivel, slot) → {nome, codigos, nomes}.
+
+    As linhas chegam na ordem do id; dentro da caixa é a ordem em que os produtos entraram (a fatia de cima é a
+    do primeiro). O nome vale o da primeira linha que tiver um.
+    """
+    caixas: dict[tuple[int, int, int, int], dict[str, Any]] = {}
+    for r in estantes:
+        cod = (r.get("produto_codigo") or "").strip()
+        if not cod:
+            continue
+        chave = (int(r.get("estante_num") or 0), int(r.get("coluna") or 0), int(r.get("nivel") or 0),
+                 int(r.get("slot") or 0))
+        cx = caixas.setdefault(chave, {"nome": None, "codigos": [], "nomes": {}})
+        if cod not in cx["codigos"]:
+            cx["codigos"].append(cod)
+            cx["nomes"][cod] = r.get("produto_nome") or ""
+        nome = (r.get("caixa_nome") or "").strip()
+        if nome and not cx["nome"]:
+            cx["nome"] = nome
+    return {k: v for k, v in caixas.items() if len(v["codigos"]) > 1}
+
+
+def _aceita_caixa_mista(num: int) -> bool:
+    """Estruturas com vários slots por posição (madeira, EDR-300, Estante Parede). Expositores, ilha, mostruário e
+    paletes têm um produto por endereço."""
+    return not (num in ESTANTES_REMOVIDAS or num in (MAGNOJET, NELLORE, MONITOR, MADEIRA, ILHA, MOSTRUARIO)
+                or num >= PALETE_MIN)
+
+
+def _loc_estante(num: int, niv: int) -> str:
+    """Texto do endereço de estante no cartão: "Nível 3", "Seção 14 · Nível 2", "Posição 7"…"""
+    if num == MOSTRUARIO:
+        return f"Posição {niv + 1}"                            # o nível é a posição 1–20 no tampo
+    if num == MADEIRA:
+        return f"Degrau {DEGRAUS_MADEIRA[niv]}"
+    if numero_no_mapa("estante", num) == num:
+        return f"Nível {niv + 1}"
+    return f"Seção {num} · Nível {niv + 1}"
+
+
 def montar(
     gondolas: list[dict[str, Any]],
     estantes: list[dict[str, Any]],
     quantidades: list[dict[str, Any]],
+    saldos: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Cruza gondola_layout, estante_layout e estoque_localizado e devolve o JSON da cena."""
+    """Cruza gondola_layout, estante_layout e estoque_localizado e devolve o JSON da cena.
+
+    `saldos` (código → "falta" | "sobra" | "ok") pinta as fatias das caixas mistas; sem ele, a fatia fica com a cor
+    neutra (saldo desconhecido).
+    """
     # Somas por endereço (o prefixo por TIPO evita misturar números iguais de tipos diferentes)
     somas: dict[tuple, float] = {}
     for r in quantidades:
@@ -332,32 +383,47 @@ def montar(
         if (cod, num, niv) in vistos:
             continue
         vistos.add((cod, num, niv))
-        no_mapa = numero_no_mapa("estante", num)
-        if num == MOSTRUARIO:
-            loc = f"Posição {niv + 1}"                            # o nível é a posição 1–20 no tampo
-        elif num == MADEIRA:
-            loc = f"Degrau {DEGRAUS_MADEIRA[niv]}"
-        elif no_mapa == num:
-            loc = f"Nível {niv + 1}"
-        else:
-            loc = f"Seção {num} · Nível {niv + 1}"
-        por_item.setdefault(("estante", no_mapa), []).append(
-            {"c": cod, "n": r.get("produto_nome") or "", "loc": loc,
+        por_item.setdefault(("estante", numero_no_mapa("estante", num)), []).append(
+            {"c": cod, "n": r.get("produto_nome") or "", "loc": _loc_estante(num, niv),
              "q": somas.get(("e", cod, num, niv)), "o": num * 10 + niv, "k": (num, niv)}
         )
+
+    # Caixas mistas: vão para a estrutura do mapa com as fatias (código, nome, quantidade na posição, saldo).
+    # A quantidade é a do produto NA POSIÇÃO (estoque_localizado não tem slot), como no app.
+    mistas_por_item: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    for (num, col, niv_db, slot), cx in caixas_mistas(estantes).items():
+        if not _aceita_caixa_mista(num):
+            continue
+        niv = _clamp(niv_db, 0, niveis_produto(num) - 1)
+        mistas_por_item.setdefault(("estante", numero_no_mapa("estante", num)), []).append({
+            "nome": cx["nome"],
+            "loc": f"{_loc_estante(num, niv)} · slot {slot + 1}",
+            "e": num, "col": max(0, col), "niv": niv, "s": max(0, slot),
+            "pr": [{"c": c, "n": cx["nomes"][c], "q": somas.get(("e", c, num, niv)),
+                    "st": (saldos or {}).get(c)} for c in cx["codigos"]],
+        })
 
     catalogo: dict[str, str] = {}
     itens = []
     for it in ITENS:
         prods = sorted(por_item.get((it["tipo"], it["n"]), []), key=lambda p: (p["o"], p["n"]))
         ocupadas = len({p["k"] for p in prods})                   # faixas com ao menos um produto
+        mistas = sorted(mistas_por_item.get((it["tipo"], it["n"]), []),
+                        key=lambda c: (c["e"], c["niv"], c["col"], c["s"]))
+        # Cada produto de caixa mista aponta ("mx") para a (primeira) caixa dele no mesmo nível: o cartão agrupa
+        # por ela.
+        for i, cx in enumerate(mistas):
+            codigos = {f["c"] for f in cx["pr"]}
+            for p in prods:
+                if "mx" not in p and p["k"] == (cx["e"], cx["niv"]) and p["c"] in codigos:
+                    p["mx"] = i
         for p in prods:
             p.pop("o")
             p.pop("k")
             if p["c"].strip():
                 catalogo.setdefault(p["c"], p["n"])
         itens.append({**it, "rot": rotulo_curto(it), "nome": nome_estrutura(it), "prod": prods,
-                      "cx": caixas.get((it["tipo"], it["n"]), []),
+                      "cx": caixas.get((it["tipo"], it["n"]), []), "mistas": mistas,
                       "faixas": faixas(it), "ocupadas": min(ocupadas, faixas(it))})
 
     return {
@@ -365,6 +431,7 @@ def montar(
         "gondola": {"r": GONDOLA_R, "prat": [list(p) for p in GONDOLA_PRATELEIRAS], "escala": GONDOLA_ESCALA},
         "estanteH": ESTANTE_H,
         "ilha": {"colunas": COLUNAS_ESPACOS_ILHA, "espacos": ESPACOS_ILHA},
+        "caixaMax": PRODUTOS_MAX_POR_CAIXA,
         "alturaBoneco": ALTURA_GONDOLA,
         "itens": itens,
         "refs": [{"nome": n, "x": x, "z": z, "parede": p} for n, x, z, p in REFERENCIAS],

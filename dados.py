@@ -235,6 +235,51 @@ def montar(
     }
 
 
+def saldos_das_caixas(
+    estantes: list[dict[str, Any]],
+    mestre: list[dict[str, Any]] | None,
+    vinculos: dict[str, str],
+    enderecado_rows: list[dict[str, Any]] | None,
+) -> dict[str, str]:
+    """Saldo ("falta" | "sobra" | "ok") dos produtos das caixas mistas da loja — a mesma conta do galpão
+    (todos os endereços × qtd_sistema, códigos vinculados somados). Sem estoque_mestre ou sem o endereçado,
+    vazio: a fatia fica neutra em vez de afirmar um saldo."""
+    if mestre is None or enderecado_rows is None:
+        return {}
+    codigos = {c for cx in lj.caixas_mistas(estantes).values() for c in cx["codigos"]
+               if not es.codigo_eh_estocado(c)}
+    if not codigos:
+        return {}
+    sistema: dict[str, float] = {}
+    nome_mestre: dict[str, str] = {}
+    for m in mestre:
+        c = g.normalizar_codigo(m.get("codigo"))
+        if c is not None:
+            sistema[c] = _num(m.get("qtd_sistema"))
+            nome_mestre[c] = m.get("produto") or ""
+    enderecado: dict[str, float] = {}
+    for e in enderecado_rows:
+        c = g.normalizar_codigo(e.get("produto_codigo"))
+        if c is not None:
+            enderecado[c] = _num(e.get("enderecado"))
+    grupos = g.grupos_de_codigos(codigos, vinculos, nome_mestre)
+    return {
+        cod: "falta" if s.falta else "sobra" if s.sobra else "ok"
+        for cod, s in g.montar_saldos(codigos, grupos, sistema, enderecado).items()
+    }
+
+
+def _vinculos(mapa, mapa_cod) -> dict[str, str]:
+    vinculos: dict[str, str] = {}
+    for tabela in (mapa, mapa_cod):  # tabela ausente: segue só com o nome
+        for row in tabela or []:
+            c = g.normalizar_codigo(row.get("codigo"))
+            pid = str(row.get("produto_id") if row.get("produto_id") is not None else "").strip()
+            if c and pid:
+                vinculos[c] = pid
+    return vinculos
+
+
 def _racks(pilhas: dict[Any, list[dict[str, Any]]]):
     return (r for pilha in pilhas.values() for r in pilha)
 
@@ -243,15 +288,7 @@ def _montar_galpao_de(racks, posicoes, mestre, mapa, mapa_cod, end, itens=None) 
     if racks is None or mestre is None or end is None:
         raise TursoErro("não consegui ler galpao_racks / estoque_mestre / estoque_localizado")
 
-    vinculos: dict[str, str] = {}
-    for tabela in (mapa, mapa_cod):  # tabela ausente: segue só com o nome
-        for row in tabela or []:
-            c = g.normalizar_codigo(row.get("codigo"))
-            pid = str(row.get("produto_id") if row.get("produto_id") is not None else "").strip()
-            if c and pid:
-                vinculos[c] = pid
-
-    dados = montar(racks, mestre, vinculos, end, itens)
+    dados = montar(racks, mestre, _vinculos(mapa, mapa_cod), end, itens)
     dados["avisos"] = _avisos_planta(posicoes)
     return dados
 
@@ -362,10 +399,14 @@ SQL_GONDOLAS = (
     "SELECT DISTINCT produto_codigo, produto_nome, gondola_num, andar, pos_x, pos_z, cor_hex "
     "FROM gondola_layout ORDER BY produto_nome"
 )
+# SELECT * e não a lista de colunas: estante_layout.caixa_nome (nome da caixa mista) só existe depois que o app
+# novo abre no banco, e uma coluna que falta derrubaria a leitura da loja inteira. Ordem do id: dentro de uma caixa
+# mista é a ordem dos produtos (a fatia de cima é a do primeiro). Cada linha é uma caixa na prateleira (ou um
+# produto de uma caixa mista), então não há DISTINCT.
 SQL_ESTANTES = (
-    "SELECT DISTINCT produto_codigo, produto_nome, estante_num, nivel, coluna, slot, cor_hex FROM estante_layout "
+    "SELECT * FROM estante_layout "
     f"WHERE estante_num NOT IN ({', '.join(map(str, lj.ESTANTES_REMOVIDAS))}) "
-    f"AND NOT (estante_num = {lj.NELLORE} AND nivel = 0) ORDER BY produto_nome"
+    f"AND NOT (estante_num = {lj.NELLORE} AND nivel = 0) ORDER BY id"
 )
 SQL_QTD_LOJA = (
     "SELECT produto_codigo, local_tipo, local_num, face_ou_coluna, andar_ou_nivel, quantidade "
@@ -386,6 +427,7 @@ def loja_exemplo() -> dict[str, Any]:
     """Loja fictícia, determinística, só para ver o mapa sem o banco."""
     rnd = random.Random(21)
     gond, est, qtd = [], [], []
+    ocupados: set[tuple[int, int, int, int]] = set()          # (estante, coluna, nível, slot) já com caixa
     for it in lj.ITENS:
         if it["kind"] == "balcao":
             continue
@@ -407,13 +449,31 @@ def loja_exemplo() -> dict[str, Any]:
                 col = rnd.randint(0, lj.PRODUTOS_POR_ESPACO_ILHA - 1) if it["kind"] == "ilha" else 0
                 if it["kind"] not in ("ilha", "mostruario"):
                     col = rnd.randint(0, 2)
+                # Slot livre: dois produtos no mesmo slot seriam uma caixa mista (sorteio repetido é pulado).
+                slot = rnd.randint(0, 3)
+                if (num, col, nivel, slot) in ocupados:
+                    continue
+                ocupados.add((num, col, nivel, slot))
                 est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": num, "nivel": nivel,
-                            "coluna": col, "slot": rnd.randint(0, 3), "cor_hex": rnd.choice(_CORES_DEMO)})
+                            "coluna": col, "slot": slot, "cor_hex": rnd.choice(_CORES_DEMO)})
                 qtd.append({"produto_codigo": cod, "local_tipo": "estante", "local_num": num,
                             "face_ou_coluna": col, "andar_ou_nivel": nivel, "quantidade": q})
-    dados = lj.montar(gond, est, qtd)
+    # Uma caixa mista de exemplo na Estante Parede (E13·4: coluna 0, nível 2), como no Gondolas.
+    for cod, nome, q in _CAIXA_MISTA_DEMO:
+        est.append({"produto_codigo": cod, "produto_nome": nome, "estante_num": lj.PAREDE_MIN, "nivel": 2,
+                    "coluna": 0, "slot": 5, "cor_hex": "#95a5a6", "caixa_nome": "Peças Hoppner"})
+        qtd.append({"produto_codigo": cod, "local_tipo": "estante", "local_num": lj.PAREDE_MIN,
+                    "face_ou_coluna": 0, "andar_ou_nivel": 2, "quantidade": q})
+    dados = lj.montar(gond, est, qtd, {"900105": "sobra", "900108": "falta", "900106": "ok"})
     dados["avisos"] = []
     return dados
+
+
+_CAIXA_MISTA_DEMO = [
+    ("900105", "DIAFRAGMA BOMBA HOPPNER", 6),
+    ("900106", "VALVULA ANTIGOTEJO", 12),
+    ("900108", "FILTRO DE BICO 80 MESH", 20),
+]
 
 
 # ── Barracão ────────────────────────────────────────────────────────────────
@@ -511,7 +571,8 @@ def ler_tudo(url: str, token: str) -> dict[str, Any]:
     if gond is None or est is None:
         loja, erros["loja"] = loja_exemplo(), "não consegui ler gondola_layout / estante_layout"
     else:
-        loja = lj.montar(gond, est, qtd or [])
+        saldos = saldos_das_caixas(est, res[2], _vinculos(res[3], res[4]), res[5])
+        loja = lj.montar(gond, est, qtd or [], saldos)
         loja["avisos"] = [] if qtd is not None else ["estoque_localizado não pôde ser lida; as quantidades da loja não aparecem."]
     barracao = br.montar(barr, res[12] if len(res) > 12 else None)
     return {"galpao": galpao, "loja": loja, "barracao": barracao, "erros": erros,

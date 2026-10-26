@@ -14,6 +14,13 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 - **Rack misto:** o Gondolas deixa até 5 produtos no mesmo palete (o primeiro em `galpao_racks`, os outros em
   `galpao_rack_itens`). Aqui o rack misto ganha duas faixas escuras, o cartão e a dica listam todos os produtos, e a
   busca e a cor de saldo valem para qualquer um deles. Banco sem a tabela nova: o galpão segue só com os racks.
+- **Caixa mista na loja:** o Gondolas deixa até 5 produtos na mesma caixa de estante (madeira, EDR-300 e Estante
+  Parede) — cada produto é uma linha de `estante_layout` no mesmo `(estante_num, coluna, nivel, slot)` e o nome opcional
+  fica em `estante_layout.caixa_nome`. Aqui a caixa daquele slot é desenhada fatiada, de cima para baixo na ordem do
+  app, cada fatia pintada pelo saldo do produto (vermelho falta endereçar, azul acima do sistema, branco fecha; cinza
+  sem saldo), com filete escuro entre elas e o selo laranja `+N`. A busca acende a fatia do produto achado. O cartão
+  agrupa os produtos dela (`🗄 Peças Hoppner · Nível 3 · slot 6 · 3/5`) e a dica marca `🗄`. O saldo é a mesma conta
+  do galpão. A loja lê `SELECT *` de `estante_layout` para não quebrar em banco que ainda não tem a coluna `caixa_nome`.
 - **Loja (gôndolas e estantes):** planta de 10 × 14 m com as 12 gôndolas, estantes de parede, EDR-300,
   expositores MagnoJet/Nellore/Monitor, Estante Parede, balcão e os bonecos que caminham pelos corredores.
   No corredor central, entre a G7 e a G6, a **ilha de paletes**: 12 paletes com tapume verde (2 × 6, numerados de
