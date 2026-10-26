@@ -1,7 +1,8 @@
 """Barracão da CAMDA: planta (35 × 10 m) e endereços de palete.
 
 Porte de LeoLira1/Gondolas: lib/barracao_config.dart (medidas, aberturas, layout padrão),
-lib/barracao_service.dart e a tabela barracao_enderecos (turso_service.dart). No Gondolas o
+lib/barracao_service.dart e as tabelas barracao_enderecos (o palete no chão, com a gaiola
+de baixo) e barracao_gaiolas (as gaiolas empilhadas em cima, níveis 2 a GAIOLAS_MAX). No Gondolas o
 barracão inteiro trabalha em CENTÍMETROS; aqui o JSON da cena sai em METROS.
 
 Sem Streamlit e sem rede, para poder ser testado.
@@ -29,6 +30,9 @@ ABERTURAS = (
 # Palete de madeira e bag de 1000 kg em cima
 PALETE_X, PALETE_Z, PALETE_H = 120.0, 100.0, 15.0
 BAG_X, BAG_Z, BAG_H = 100.0, 85.0, 130.0
+
+# Pilha de gaiolas por endereço, a do chão incluída: o pé-direito do barracão só comporta 3 de altura
+GAIOLAS_MAX = 3
 
 # Layout padrão (semente da tabela barracao_enderecos)
 PASSO_X = 135.0           # palete 120 + folga 15
@@ -91,22 +95,52 @@ def _num(v: Any) -> float:
         return 0.0
 
 
-def montar(linhas: list[dict[str, Any]] | None) -> dict[str, Any]:
-    """JSON da cena, em metros. `linhas` = barracao_enderecos; sem linhas, o layout padrão (tudo livre)."""
+def _gaiola(r: dict[str, Any]) -> dict[str, Any]:
+    return {"c": r.get("produto_codigo") or "", "n": r.get("produto_nome") or "",
+            "q": _num(r.get("quantidade")), "e": codigo_eh_estocado(r.get("produto_codigo"))}
+
+
+def gaiolas_do(p: dict[str, Any]) -> list[dict[str, Any]]:
+    """Todas as gaiolas da pilha do palete, de baixo para cima, com o nível em `nv` (1 = a do chão)."""
+    if not p["c"].strip():
+        return []
+    return [{"nv": 1, "c": p["c"], "n": p["n"], "q": p["q"], "e": p["e"]}, *p.get("g", [])]
+
+
+def rotulo_gaiola(rot: str, nv: int) -> str:
+    """'BAR-07' para a gaiola do chão, 'BAR-07 · N3' para uma empilhada."""
+    return f"{rot} · N{nv}" if nv > 1 else rot
+
+
+def montar(linhas: list[dict[str, Any]] | None,
+           gaiolas: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """JSON da cena, em metros. `linhas` = barracao_enderecos; sem linhas, o layout padrão (tudo livre).
+
+    `gaiolas` = barracao_gaiolas (None quando a tabela não existe — banco de antes da pilha).
+    Cada palete leva em `g` as gaiolas de cima, de baixo para cima, com o nível em `nv`.
+    """
     padrao = not linhas
     pal: list[dict[str, Any]] = []
     if linhas:
+        acima: dict[Any, list[dict[str, Any]]] = {}
+        for r in sorted(gaiolas or [], key=lambda r: _num(r.get("nivel"))):
+            acima.setdefault(r.get("endereco_id"), []).append(_gaiola(r))
         for r in linhas:
+            pilha = [_gaiola(r)] if (r.get("produto_codigo") or "").strip() else []
+            pilha += acima.get(r.get("id"), [])
+            # Chão vazio com gaiola em cima não existe fisicamente: a de baixo vai para o chão.
+            pilha = pilha[:GAIOLAS_MAX]
+            chao = pilha[0] if pilha else {"c": "", "n": "", "q": 0.0, "e": False}
             pal.append({
                 "id": r.get("id"), "rot": r.get("rotulo") or "",
                 "x": _num(r.get("pos_x")) / 100, "z": _num(r.get("pos_z")) / 100,
-                "c": r.get("produto_codigo") or "", "n": r.get("produto_nome") or "",
-                "q": _num(r.get("quantidade")),
-                "e": codigo_eh_estocado(r.get("produto_codigo")),
+                **chao,
+                "g": [{"nv": i + 2, **g} for i, g in enumerate(pilha[1:])],
             })
     else:
         for p in posicoes_padrao():
-            pal.append({"id": None, "rot": p["rot"], "x": p["x"] / 100, "z": p["z"] / 100, "c": "", "n": "", "q": 0.0, "e": False})
+            pal.append({"id": None, "rot": p["rot"], "x": p["x"] / 100, "z": p["z"] / 100,
+                        "c": "", "n": "", "q": 0.0, "e": False, "g": []})
 
     # Fileiras: agrupa os Z (a 10 cm), do fundo (maior Z) para a frente
     zs = sorted({round(p["z"] * 10) for p in pal}, reverse=True)
@@ -117,18 +151,18 @@ def montar(linhas: list[dict[str, Any]] | None) -> dict[str, Any]:
     catalogo: dict[str, str] = {}
     catalogo_est: set[tuple[str, str]] = set()
     for p in pal:
-        if not p["c"].strip():
-            continue
-        if p["e"]:  # estocado: um item por cooperado (o código se repete entre cooperados)
-            catalogo_est.add((p["c"], p["n"]))
-        else:
-            catalogo.setdefault(p["c"], p["n"])
+        for g in gaiolas_do(p):
+            if g["e"]:  # estocado: um item por cooperado (o código se repete entre cooperados)
+                catalogo_est.add((g["c"], g["n"]))
+            else:
+                catalogo.setdefault(g["c"], g["n"])
     return {
         "padrao": padrao,
         "w": LARGURA / 100, "d": PROFUNDIDADE / 100, "h": PE_DIREITO / 100, "esp": ESPESSURA / 100,
         "aberturas": [{"tipo": t, "x0": a / 100, "x1": b / 100, "h": h / 100} for t, a, b, h in ABERTURAS],
         "palete": {"x": PALETE_X / 100, "z": PALETE_Z / 100, "h": PALETE_H / 100},
         "bag": {"x": BAG_X / 100, "z": BAG_Z / 100, "h": BAG_H / 100},
+        "gaiolasMax": GAIOLAS_MAX,
         "corredor": CORREDOR_MANOBRA / 100,
         "fileiras": len(zs),
         "pal": pal,

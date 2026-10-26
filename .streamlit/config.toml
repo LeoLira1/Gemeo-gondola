@@ -8,3 +8,7 @@ font = "sans serif"
 
 [client]
 toolbarMode = "minimal"
+
+[server]
+# serve static/ em app/static/ (modelos .glb da cena; ver static/modelos/CREDITOS.md)
+enableStaticServing = true

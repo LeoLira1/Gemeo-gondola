@@ -13,6 +13,7 @@
     <div class="panel field"><label for="qProd">Produto</label><input id="qProd" placeholder="nome, código ou 2 termos" autocomplete="off"></div>
     <button class="btn" id="bVista" title="Voltar ao enquadramento inicial">⟲ Vista</button>
     <button class="btn" id="bBoneco" title="Quantos bonecos caminham pela loja">🚶 1</button>
+    <button class="btn" id="bCaixas" title="Mostrar ou esconder as caixas dos produtos nas prateleiras">📦 Caixas</button>
     <span id="msg"></span>
   </div></div>
   <div id="info" class="panel"></div>
@@ -22,8 +23,10 @@
     <span><i style="background:#2fbf5f"></i>Ilha de paletes</span>
     <span><i style="background:#8a6a42"></i>Mostruário (palete)</span>
     <span><i style="background:#1f9350"></i><i style="background:#8a6a52;margin-left:-4px"></i>Balcão</span>
+    <span><i style="background:#e87722"></i>Caixa do produto buscado</span>
     <span><i style="background:rgba(46,158,79,.55);border-color:#2e9e4f"></i>Produto buscado (marca no chão)</span>
     <span><i style="background:transparent;border:2px solid #e87722"></i>Selecionada</span>
+    <span><i style="background:linear-gradient(#e53935 0 33%,#2b2a27 33% 38%,#1565c0 38% 66%,#2b2a27 66% 71%,#f4f2ed 71%)"></i>Caixa mista (fatia = saldo)</span>
   </div>
   <div id="stats" class="panel"></div>
   <div id="tip"></div>
@@ -38,7 +41,7 @@ const D = /*__DADOS__*/null;
 const ORANGE = 0xe87722, GREEN = 0x2e9e4f;
 // Cores reais do Gondolas: gôndola verde, estante azul, balcão verde-escuro com tampo de mármore marrom.
 const C_GOND = 0x4caf50, C_EST = 0x4a93d8, C_ILHA = 0x2fbf5f, C_MADEIRA = 0x8a6a42, C_BALCAO = 0x1f9350, C_TAMPO = 0x8a6a52, C_PAREDE = 0xd2cdc2, C_FADE = 0xe9e6df;
-const state = { sel: null, matched: new Set(), bonecos: 1 };
+const state = { sel: null, matched: new Set(), bonecos: 1, caixas: true };
 const fmt = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
 const $ = (id) => document.getElementById(id);
 const fold = (s) => (s || "").toString().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -228,12 +231,14 @@ function montarMadeira(S, it) {
 
 const estruturas = [];                              // {it, S, hit, label, base}
 const labels = [];
+const selosCaixa = [];                              // "+N" das caixas mistas: seguem o botão Caixas, não o Rótulos
 function makeLabelTex(txt, estilo) {
   const k = txt + "|" + estilo;
   return (makeLabelTex.c ||= {})[k] ||= (() => {
     const c = document.createElement("canvas"); c.width = 192; c.height = 80;
     const g = c.getContext("2d");
-    const cores = { n: ["rgba(255,255,255,.93)", "#2b2a27", "#d4d0c6"], h: ["#2e9e4f", "#fff", "#2e9e4f"], s: ["#e87722", "#fff", "#e87722"] }[estilo];
+    const cores = { n: ["rgba(255,255,255,.93)", "#2b2a27", "#d4d0c6"], h: ["#2e9e4f", "#fff", "#2e9e4f"], s: ["#e87722", "#fff", "#e87722"],
+                    c: ["#e87722", "#0b0d10", "#0b0d10"] }[estilo];
     g.fillStyle = cores[0]; g.strokeStyle = cores[2]; g.lineWidth = 3;
     g.beginPath(); g.roundRect ? g.roundRect(6, 8, 180, 64, 22) : g.rect(6, 8, 180, 64); g.fill(); g.stroke();
     g.fillStyle = cores[1]; g.font = "bold 40px system-ui, Segoe UI, Arial, sans-serif";
@@ -273,6 +278,109 @@ for (const it of D.itens) {
   estruturas.push({ it, S, hit, label: lab, base, matched: false, halo });
 }
 const hits = estruturas.filter((e) => e.hit).map((e) => e.hit);
+
+// ── Caixas dos produtos ─────────────────────────────────────────────────────
+// Cada linha de gondola_layout / estante_layout vira uma caixa na prateleira, na cor que o app gravou
+// (cor_hex, por categoria). Gôndola: pos_x/pos_z do app (escala da cena de detalhe) × escala do mapa.
+// Estantes e expositores: o app tem uma grade própria por modelo; aqui a posição é proporcional —
+// coluna e slot dividem o comprimento, o nível escolhe a prateleira. Uma InstancedMesh só para todas.
+const caixas = [];                                  // {x, y, z, w, h, d, cor, c, ei}
+function vagaEstante(it, cx, cz, w, d, nNiveis, h, k, maxCol, maxSlot) {
+  const alongZ = d >= w, L = alongZ ? d : w, P = alongZ ? w : d;
+  const nc = Math.max(3, maxCol + 1), ns = Math.max(4, maxSlot + 1);
+  const cel = L / nc, u = -L / 2 + cel * (Math.min(k.col, nc - 1) + (Math.min(k.s, ns - 1) + 0.5) / ns);
+  const gap = (h - SH) / (nNiveis - 1), bw = Math.min(cel / ns * 0.82, 0.16), bh = Math.min(gap * 0.62, 0.16), bd = Math.min(P * 0.45, 0.16);
+  const y = Math.min(k.niv, nNiveis - 1) * gap + SH;
+  return alongZ ? { x: cx, z: cz + u, y, w: bd, h: bh, d: bw } : { x: cx + u, z: cz, y, w: bw, h: bh, d: bd };
+}
+function vagaExpositor(it, k, nNiveis, maxCol) {
+  // caixas encostadas no painel de fundo (lado -Z), uma faixa por nível, colunas ao longo da largura
+  const nc = Math.max(5, maxCol + 1), cel = it.w / nc, y0 = 0.10, y1 = EH * 0.80;
+  const gap = (y1 - y0) / nNiveis, bw = Math.min(cel * 0.75, 0.12), bh = Math.min(gap * 0.7, 0.12);
+  return { x: it.x - it.w / 2 + cel * (Math.min(k.col, nc - 1) + 0.5), y: y0 + Math.min(k.niv, nNiveis - 1) * gap,
+           z: it.z - it.d / 2 + 0.05 + 0.06, w: bw, h: bh, d: 0.1 };
+}
+function vagaCaixa(it, k, maxCol, maxSlot) {
+  if (it.kind === "gondola") {
+    const e = D.gondola.escala, [, yc, hh] = D.gondola.prat[k.a], b = 0.40 * e;
+    return { x: it.x + k.x * e, z: it.z + k.z * e, y: (yc + hh / 2) * e, w: b, h: 0.52 * e, d: b };
+  }
+  if (it.kind === "parede") {                       // 6 seções (E13–E18) ao longo de Z, 6 níveis
+    const sec = Math.min(Math.max(k.e - 13, 0), 5), ld = it.d / 6;
+    return vagaEstante(it, it.x + 0.02, it.z - it.d / 2 + ld * (sec + 0.5), it.w - 0.04, ld, 6, 0.55, k, maxCol, maxSlot);
+  }
+  if (it.kind === "edr300x3") return vagaEstante(it, it.x, it.z, it.w, it.d, 6, EH, k, Math.max(maxCol, 2), maxSlot);
+  if (it.kind === "edr300") return vagaEstante(it, it.x, it.z, it.w, it.d, 6, EH, k, maxCol, maxSlot);
+  if (it.kind === "magnojet") return vagaExpositor(it, k, 7, maxCol);
+  if (it.kind === "nellore") return vagaExpositor(it, k, 6, maxCol);
+  if (it.kind === "monitor") return vagaExpositor(it, k, 4, maxCol);
+  if (it.kind === "ilha") {                         // espaço = nível (2 × 6), produto = coluna: 3 na frente, 2 atrás
+    const nc = D.ilha.colunas, pw = it.w / nc, pd = it.d / (D.ilha.espacos / nc);
+    const c = k.niv % nc, r = Math.floor(k.niv / nc), p = Math.min(k.col, 4), fila = p < 3 ? 0 : 1, nf = fila ? 2 : 3;
+    const b = Math.min(pw, pd) * 0.26;
+    return { x: it.x - it.w / 2 + c * pw + pw * ((fila ? p - 3 : p) + 0.5) / nf, y: 0.12, z: it.z - it.d / 2 + r * pd + pd * (fila ? 0.7 : 0.3), w: b, h: b * 0.9, d: b };
+  }
+  if (it.kind === "madeira") {                      // degrau = nível (0 = o de baixo, na frente), 6 produtos ao longo do balcão
+    const n = 3, niv = Math.min(k.niv, n - 1), piso = it.w / n, cel = it.d / 6;
+    return { x: it.x - it.w / 2 + piso * (n - 1 - niv + 0.5), y: (0.45 * (niv + 1)) / n, z: it.z - it.d / 2 + cel * (Math.min(k.col, 5) + 0.5),
+             w: piso * 0.75, h: 0.10, d: cel * 0.75 };
+  }
+  if (it.kind === "mostruario") {                   // 20 posições no tampo: 4 ao longo da parede × 5
+    const p = Math.min(k.niv, 19), cz = p % 4, cx = Math.floor(p / 4), b = 0.14;
+    return { x: it.x - it.w / 2 + it.w * (cx + 0.5) / 5, y: 0.144, z: it.z - it.d / 2 + it.d * (cz + 0.5) / 4, w: b, h: 0.08, d: b };
+  }
+  return vagaEstante(it, it.x, it.z, it.w, it.d, 5, EH, k, maxCol, maxSlot);
+}
+// Caixa mista (até 5 produtos na mesma caixa, como no Gondolas): as linhas do mesmo slot viram UMA caixa, fatiada
+// de cima para baixo na ordem do app, cada fatia pintada pelo saldo do produto, com filete escuro entre elas e o selo
+// laranja "+N". As fatias são instâncias como as outras caixas: a busca acende a do produto achado.
+const COR_SALDO = { falta: 0xe53935, sobra: 0x1565c0, ok: 0xf4f2ed }, COR_SEM_SALDO = 0xb8b2a6, COR_FILETE = 0x2b2a27;
+const corFatia = (st) => COR_SALDO[st] ?? COR_SEM_SALDO;
+estruturas.forEach((e, ei) => {
+  const lista = e.it.cx || [];
+  const maxCol = lista.reduce((m, k) => Math.max(m, k.col || 0), 0), maxSlot = lista.reduce((m, k) => Math.max(m, k.s || 0), 0);
+  const mistas = new Map((e.it.mistas || []).map((m) => [[m.e, m.col, m.niv, m.s].join(), m]));
+  const feitas = new Set();
+  for (const k of lista) {
+    const chave = [k.e, k.col, k.niv, k.s].join(), mx = mistas.get(chave);
+    if (!mx) { caixas.push({ ...vagaCaixa(e.it, k, maxCol, maxSlot), cor: new THREE.Color(k.h), c: normCod(k.c), ei }); continue; }
+    if (feitas.has(chave)) continue;                // as outras linhas da mesma caixa já viraram fatias
+    feitas.add(chave);
+    const v = vagaCaixa(e.it, k, maxCol, maxSlot), n = mx.pr.length, hF = v.h / n, fil = Math.min(0.004, hF * 0.2);
+    mx.pr.forEach((p, i) => {
+      const topo = v.y + v.h - i * hF, base = i === n - 1 ? v.y : topo - hF + fil;
+      caixas.push({ ...v, y: base, h: topo - base, cor: new THREE.Color(corFatia(p.st)), c: normCod(p.c), ei });
+      if (i < n - 1) caixas.push({ ...v, y: topo - hF, h: fil, w: v.w * 0.98, d: v.d * 0.98, cor: new THREE.Color(COR_FILETE), c: "", ei });
+    });
+    const selo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTex("+" + n, "c"), transparent: true, depthTest: false }));
+    selo.renderOrder = 11; selo.userData.base = 0.3; selo.position.set(v.x, v.y + v.h + 0.05, v.z);
+    scene.add(selo); selosCaixa.push(selo);
+  }
+});
+const meshCaixas = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0 }), Math.max(caixas.length, 1));
+meshCaixas.count = caixas.length; meshCaixas.castShadow = meshCaixas.receiveShadow = true;
+{
+  const m4 = new THREE.Matrix4();
+  caixas.forEach((b, i) => { m4.makeScale(b.w, b.h, b.d).setPosition(b.x, b.y + b.h / 2, b.z); meshCaixas.setMatrixAt(i, m4); });
+  meshCaixas.instanceMatrix.needsUpdate = true;
+}
+scene.add(meshCaixas);
+const C_CX_FADE = new THREE.Color(C_FADE), C_CX_ACHADA = new THREE.Color(ORANGE), _cxTmp = new THREE.Color();
+// Busca ativa: as caixas do produto acendem em laranja (como no app); as outras esmaecem.
+function pintarCaixas() {
+  const busca = state.matched.size > 0;
+  caixas.forEach((b, i) => {
+    const cor = !busca ? b.cor : state.matched.has(b.c) ? C_CX_ACHADA : _cxTmp.copy(b.cor).lerp(C_CX_FADE, 0.8);
+    meshCaixas.setColorAt(i, cor);
+  });
+  if (meshCaixas.instanceColor) meshCaixas.instanceColor.needsUpdate = true;
+}
+function aplicarCaixas() {
+  meshCaixas.visible = state.caixas;
+  for (const s of selosCaixa) s.visible = state.caixas;
+  $("bCaixas").classList.toggle("off", !state.caixas); dirty = true;
+}
+$("bCaixas").onclick = () => { state.caixas = !state.caixas; aplicarCaixas(); };
 
 // Rótulos de referência (CAIXA, COZINHA, ENTRADA…) deitados no piso / no topo da parede
 for (const r of D.refs) {
@@ -316,6 +424,7 @@ function pintar() {
     const estilo = state.sel === e.it.rot && e.it.kind !== "balcao" ? "s" : e.matched ? "h" : "n";
     e.label.material.map = makeLabelTex(e.it.rot, estilo); e.label.material.needsUpdate = true;
   }
+  pintarCaixas();
   dirty = true;
 }
 const idxSel = () => estruturas.findIndex((e) => e.it.rot === state.sel);
@@ -365,10 +474,20 @@ function selecionar(rot, voar) {
   if (voar) { const alvo = new THREE.Vector3(it.x, 0.4, it.z); voarPara(alvo, alvo.clone().addScaledVector(DIR, 8)); }
 }
 function totalUn(prod) { return prod.reduce((s, p) => s + (p.q || 0), 0); }
+const TXT_SALDO = { falta: "falta endereçar", sobra: "acima do saldo", ok: "ok" };
+function linhaProduto(p) {
+  return `<div class="lv${state.matched.has(normCod(p.c)) ? " m" : ""}"><span class="l">${esc(p.loc)}</span><span class="p">${esc(p.n || p.c)}<br><b>${p.q == null ? "—" : fmt.format(p.q) + " un"}</b></span></div>`;
+}
+// Caixa mista no cartão: o nome (ou "Caixa mista"), o endereço com o slot, n/5 e uma linha por produto com a cor
+// da fatia dele.
+function blocoCaixaMista(cx) {
+  const linhas = cx.pr.map((p) => `<div class="cxp${state.matched.has(normCod(p.c)) ? " m" : ""}"><i style="background:#${corFatia(p.st).toString(16).padStart(6, "0")}"></i><span class="n">${esc(p.n || p.c)}<small>${esc(TXT_SALDO[p.st] || "sem saldo no sistema")}</small></span><b>${p.q == null ? "—" : fmt.format(p.q) + " un"}</b></div>`).join("");
+  return `<div class="cx"><div class="cxh"><span>🗄 ${esc(cx.nome || "Caixa mista")}</span><span class="l">${esc(cx.loc)} · ${cx.pr.length}/${D.caixaMax}</span></div>${linhas}</div>`;
+}
 function mostrarInfo(e) {
   const it = e.it, el = $("info"), prod = it.prod;
   const linhas = prod.length
-    ? prod.map((p) => `<div class="lv${state.matched.has(normCod(p.c)) ? " m" : ""}"><span class="l">${esc(p.loc)}</span><span class="p">${esc(p.n || p.c)}<br><b>${p.q == null ? "—" : fmt.format(p.q) + " un"}</b></span></div>`).join("")
+    ? prod.filter((p) => p.mx == null).map(linhaProduto).join("") + (it.mistas || []).map(blocoCaixaMista).join("")
     : `<div class="lv"><span></span><span class="p">Nenhum produto endereçado</span></div>`;
   el.innerHTML = `<button class="x" title="Fechar">×</button><h4>${esc(it.rot)} · ${esc(it.nome)}</h4><div class="sub">${prod.length} produto${prod.length === 1 ? "" : "s"} · ${fmt.format(totalUn(prod))} un</div>${linhas}`;
   el.style.display = "block";
@@ -505,7 +624,9 @@ function verHover() {
   add("div", prod.length ? `${prod.length} produto${prod.length === 1 ? "" : "s"} · ${fmt.format(totalUn(prod))} un` : "Nenhum produto endereçado", "s");
   const ordem = [...prod].sort((a, b) => (state.matched.has(normCod(b.c)) - state.matched.has(normCod(a.c))));
   for (const p of ordem.slice(0, 8)) {
-    const li = add("div", `${p.n || p.c} — ${p.q == null ? "—" : fmt.format(p.q) + " un"}  (${p.loc})`, "li" + (state.matched.has(normCod(p.c)) ? " m" : ""));
+    const mx = p.mx == null ? null : it.mistas[p.mx];
+    const onde = mx ? `${p.loc} · 🗄 ${mx.nome || "caixa mista"}` : p.loc;
+    const li = add("div", `${p.n || p.c} — ${p.q == null ? "—" : fmt.format(p.q) + " un"}  (${onde})`, "li" + (state.matched.has(normCod(p.c)) ? " m" : ""));
   }
   if (prod.length > 8) add("div", `+ ${prod.length - 8} produtos (clique para ver todos)`, "s");
   const h = e.S.h, w = e.it.kind === "gondola" ? D.gondola.r * 2 : e.it.w, d = e.it.kind === "gondola" ? D.gondola.r * 2 : e.it.d;
@@ -545,9 +666,9 @@ function frame(now) {
     if (k >= 1) tween = null; dirty = true;
   }
   if (state.bonecos > 0) { andarBonecos(dt); dirty = true; }
-  for (const s of labels) {
+  for (const s of labels.concat(selosCaixa)) {
     const d = camera.position.distanceTo(s.getWorldPosition(tmpV)), k = THREE.MathUtils.clamp(d * 0.03, 0.6, 1.5) * s.userData.base;
-    s.material.visible = window.__rotulosOn === true;
+    if (s.userData.base === 1) s.material.visible = window.__rotulosOn === true;
     if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2.4, 1); dirty = true; }
   }
   if (selGrupo.visible) { selFill.material.opacity = 0.28 + 0.14 * Math.sin(now / 280); dirty = true; }
@@ -560,10 +681,10 @@ function frame(now) {
 const nG = estruturas.filter((e) => e.it.tipo === "gondola").length;
 const nE = estruturas.filter((e) => e.it.tipo === "estante" && e.it.kind !== "balcao").length;
 const nProd = new Set(D.itens.flatMap((i) => i.prod.map((p) => normCod(p.c)))).size;
-$("stats").innerHTML = `<b>${nG}</b> gôndolas · <b>${nE}</b> estantes e expositores · <b>${nProd}</b> produtos endereçados`;
-redimensionar(); pintar(); aplicarBonecos();
+$("stats").innerHTML = `<b>${nG}</b> gôndolas · <b>${nE}</b> estantes e expositores · <b>${nProd}</b> produtos endereçados · <b>${caixas.length}</b> caixas`;
+redimensionar(); pintar(); aplicarBonecos(); aplicarCaixas();
 requestAnimationFrame(frame);
-window.__loja = { state, estruturas, D, camera, controls, selecionar, buscarProduto, bonecos, scene };
+window.__loja = { state, estruturas, caixas, D, camera, controls, selecionar, buscarProduto, bonecos, scene };
 /*__UI_JS__*/
 </script>
 </body>
