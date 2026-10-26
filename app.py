@@ -135,9 +135,7 @@ def _stat(rotulo: str, valor: object, cor: str | None = None) -> str:
 
 
 if mapa == "galpao":
-    pilhas = dados["pilhas"]
-    total = len(dados["posicoes"])
-    chips = [_stat(f"de {total} posições com carga", len(pilhas))]
+    chips = []
 elif mapa == "barracao":
     pal = dados["pal"]
     ocupados = [p for p in pal if p["c"].strip()]
