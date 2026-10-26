@@ -259,7 +259,7 @@ function enquadrar(r, h, animar = true) {
   if (animar) voarPara(alvo, pos); else { camera.position.copy(pos); controls.target.copy(alvo); controls.update(); }
   dirty = true;
 }
-// Em corte, enquadra até o topo da pilha mais alta (4 gaiolas passam de 5 m).
+// Em corte, enquadra até o topo da pilha mais alta (3 gaiolas passam de 4 m).
 const ALTURA_CARGA = Math.max(2.2, ...pal.map((e) => e.h + 0.4));
 const alturaVista = () => (state.paredesAltas ? PH : ALTURA_CARGA);
 const vistaTudo = (animar = true) => enquadrar({ x0: 0, x1: W, z0: 0, z1: DP }, alturaVista(), animar);

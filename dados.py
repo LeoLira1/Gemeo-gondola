@@ -505,8 +505,8 @@ def barracao_exemplo() -> dict[str, Any]:
         cod, nome = ("", "") if rnd.random() < 0.3 else rnd.choice(_PRODUTOS_DEMO)
         linhas.append({"id": i + 1, "rotulo": p["rot"], "pos_x": p["x"], "pos_z": p["z"],
                        "produto_codigo": cod, "produto_nome": nome, "quantidade": rnd.choice([1, 1, 2, 4]) if cod else 0})
-        if cod:  # pilhas de 1 a 4 gaiolas
-            for nv in range(2, 2 + rnd.choice([0, 0, 1, 2, 3])):
+        if cod:  # pilhas de 1 a 3 gaiolas
+            for nv in range(2, 2 + rnd.choice([0, 0, 1, 2])):
                 c2, n2 = rnd.choice(_PRODUTOS_DEMO)
                 gaiolas.append({"endereco_id": i + 1, "nivel": nv, "produto_codigo": c2,
                                 "produto_nome": n2, "quantidade": rnd.choice([1, 2, 4])})

@@ -31,8 +31,8 @@ ABERTURAS = (
 PALETE_X, PALETE_Z, PALETE_H = 120.0, 100.0, 15.0
 BAG_X, BAG_Z, BAG_H = 100.0, 85.0, 130.0
 
-# Pilha de gaiolas por endereço, a do chão incluída — a mesma regra do galpão
-GAIOLAS_MAX = 4
+# Pilha de gaiolas por endereço, a do chão incluída: o pé-direito do barracão só comporta 3 de altura
+GAIOLAS_MAX = 3
 
 # Layout padrão (semente da tabela barracao_enderecos)
 PASSO_X = 135.0           # palete 120 + folga 15
