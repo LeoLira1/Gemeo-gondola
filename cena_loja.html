@@ -26,6 +26,7 @@
     <span><i style="background:#e87722"></i>Caixa do produto buscado</span>
     <span><i style="background:rgba(46,158,79,.55);border-color:#2e9e4f"></i>Produto buscado (marca no chão)</span>
     <span><i style="background:transparent;border:2px solid #e87722"></i>Selecionada</span>
+    <span><i style="background:linear-gradient(#e53935 0 33%,#2b2a27 33% 38%,#1565c0 38% 66%,#2b2a27 66% 71%,#f4f2ed 71%)"></i>Caixa mista (fatia = saldo)</span>
   </div>
   <div id="stats" class="panel"></div>
   <div id="tip"></div>
@@ -230,12 +231,14 @@ function montarMadeira(S, it) {
 
 const estruturas = [];                              // {it, S, hit, label, base}
 const labels = [];
+const selosCaixa = [];                              // "+N" das caixas mistas: seguem o botão Caixas, não o Rótulos
 function makeLabelTex(txt, estilo) {
   const k = txt + "|" + estilo;
   return (makeLabelTex.c ||= {})[k] ||= (() => {
     const c = document.createElement("canvas"); c.width = 192; c.height = 80;
     const g = c.getContext("2d");
-    const cores = { n: ["rgba(255,255,255,.93)", "#2b2a27", "#d4d0c6"], h: ["#2e9e4f", "#fff", "#2e9e4f"], s: ["#e87722", "#fff", "#e87722"] }[estilo];
+    const cores = { n: ["rgba(255,255,255,.93)", "#2b2a27", "#d4d0c6"], h: ["#2e9e4f", "#fff", "#2e9e4f"], s: ["#e87722", "#fff", "#e87722"],
+                    c: ["#e87722", "#0b0d10", "#0b0d10"] }[estilo];
     g.fillStyle = cores[0]; g.strokeStyle = cores[2]; g.lineWidth = 3;
     g.beginPath(); g.roundRect ? g.roundRect(6, 8, 180, 64, 22) : g.rect(6, 8, 180, 64); g.fill(); g.stroke();
     g.fillStyle = cores[1]; g.font = "bold 40px system-ui, Segoe UI, Arial, sans-serif";
@@ -328,10 +331,31 @@ function vagaCaixa(it, k, maxCol, maxSlot) {
   }
   return vagaEstante(it, it.x, it.z, it.w, it.d, 5, EH, k, maxCol, maxSlot);
 }
+// Caixa mista (até 5 produtos na mesma caixa, como no Gondolas): as linhas do mesmo slot viram UMA caixa, fatiada
+// de cima para baixo na ordem do app, cada fatia pintada pelo saldo do produto, com filete escuro entre elas e o selo
+// laranja "+N". As fatias são instâncias como as outras caixas: a busca acende a do produto achado.
+const COR_SALDO = { falta: 0xe53935, sobra: 0x1565c0, ok: 0xf4f2ed }, COR_SEM_SALDO = 0xb8b2a6, COR_FILETE = 0x2b2a27;
+const corFatia = (st) => COR_SALDO[st] ?? COR_SEM_SALDO;
 estruturas.forEach((e, ei) => {
   const lista = e.it.cx || [];
   const maxCol = lista.reduce((m, k) => Math.max(m, k.col || 0), 0), maxSlot = lista.reduce((m, k) => Math.max(m, k.s || 0), 0);
-  for (const k of lista) caixas.push({ ...vagaCaixa(e.it, k, maxCol, maxSlot), cor: new THREE.Color(k.h), c: normCod(k.c), ei });
+  const mistas = new Map((e.it.mistas || []).map((m) => [[m.e, m.col, m.niv, m.s].join(), m]));
+  const feitas = new Set();
+  for (const k of lista) {
+    const chave = [k.e, k.col, k.niv, k.s].join(), mx = mistas.get(chave);
+    if (!mx) { caixas.push({ ...vagaCaixa(e.it, k, maxCol, maxSlot), cor: new THREE.Color(k.h), c: normCod(k.c), ei }); continue; }
+    if (feitas.has(chave)) continue;                // as outras linhas da mesma caixa já viraram fatias
+    feitas.add(chave);
+    const v = vagaCaixa(e.it, k, maxCol, maxSlot), n = mx.pr.length, hF = v.h / n, fil = Math.min(0.004, hF * 0.2);
+    mx.pr.forEach((p, i) => {
+      const topo = v.y + v.h - i * hF, base = i === n - 1 ? v.y : topo - hF + fil;
+      caixas.push({ ...v, y: base, h: topo - base, cor: new THREE.Color(corFatia(p.st)), c: normCod(p.c), ei });
+      if (i < n - 1) caixas.push({ ...v, y: topo - hF, h: fil, w: v.w * 0.98, d: v.d * 0.98, cor: new THREE.Color(COR_FILETE), c: "", ei });
+    });
+    const selo = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeLabelTex("+" + n, "c"), transparent: true, depthTest: false }));
+    selo.renderOrder = 11; selo.userData.base = 0.3; selo.position.set(v.x, v.y + v.h + 0.05, v.z);
+    scene.add(selo); selosCaixa.push(selo);
+  }
 });
 const meshCaixas = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0 }), Math.max(caixas.length, 1));
 meshCaixas.count = caixas.length; meshCaixas.castShadow = meshCaixas.receiveShadow = true;
@@ -351,7 +375,11 @@ function pintarCaixas() {
   });
   if (meshCaixas.instanceColor) meshCaixas.instanceColor.needsUpdate = true;
 }
-function aplicarCaixas() { meshCaixas.visible = state.caixas; $("bCaixas").classList.toggle("off", !state.caixas); dirty = true; }
+function aplicarCaixas() {
+  meshCaixas.visible = state.caixas;
+  for (const s of selosCaixa) s.visible = state.caixas;
+  $("bCaixas").classList.toggle("off", !state.caixas); dirty = true;
+}
 $("bCaixas").onclick = () => { state.caixas = !state.caixas; aplicarCaixas(); };
 
 // Rótulos de referência (CAIXA, COZINHA, ENTRADA…) deitados no piso / no topo da parede
@@ -446,10 +474,20 @@ function selecionar(rot, voar) {
   if (voar) { const alvo = new THREE.Vector3(it.x, 0.4, it.z); voarPara(alvo, alvo.clone().addScaledVector(DIR, 8)); }
 }
 function totalUn(prod) { return prod.reduce((s, p) => s + (p.q || 0), 0); }
+const TXT_SALDO = { falta: "falta endereçar", sobra: "acima do saldo", ok: "ok" };
+function linhaProduto(p) {
+  return `<div class="lv${state.matched.has(normCod(p.c)) ? " m" : ""}"><span class="l">${esc(p.loc)}</span><span class="p">${esc(p.n || p.c)}<br><b>${p.q == null ? "—" : fmt.format(p.q) + " un"}</b></span></div>`;
+}
+// Caixa mista no cartão: o nome (ou "Caixa mista"), o endereço com o slot, n/5 e uma linha por produto com a cor
+// da fatia dele.
+function blocoCaixaMista(cx) {
+  const linhas = cx.pr.map((p) => `<div class="cxp${state.matched.has(normCod(p.c)) ? " m" : ""}"><i style="background:#${corFatia(p.st).toString(16).padStart(6, "0")}"></i><span class="n">${esc(p.n || p.c)}<small>${esc(TXT_SALDO[p.st] || "sem saldo no sistema")}</small></span><b>${p.q == null ? "—" : fmt.format(p.q) + " un"}</b></div>`).join("");
+  return `<div class="cx"><div class="cxh"><span>🗄 ${esc(cx.nome || "Caixa mista")}</span><span class="l">${esc(cx.loc)} · ${cx.pr.length}/${D.caixaMax}</span></div>${linhas}</div>`;
+}
 function mostrarInfo(e) {
   const it = e.it, el = $("info"), prod = it.prod;
   const linhas = prod.length
-    ? prod.map((p) => `<div class="lv${state.matched.has(normCod(p.c)) ? " m" : ""}"><span class="l">${esc(p.loc)}</span><span class="p">${esc(p.n || p.c)}<br><b>${p.q == null ? "—" : fmt.format(p.q) + " un"}</b></span></div>`).join("")
+    ? prod.filter((p) => p.mx == null).map(linhaProduto).join("") + (it.mistas || []).map(blocoCaixaMista).join("")
     : `<div class="lv"><span></span><span class="p">Nenhum produto endereçado</span></div>`;
   el.innerHTML = `<button class="x" title="Fechar">×</button><h4>${esc(it.rot)} · ${esc(it.nome)}</h4><div class="sub">${prod.length} produto${prod.length === 1 ? "" : "s"} · ${fmt.format(totalUn(prod))} un</div>${linhas}`;
   el.style.display = "block";
@@ -586,7 +624,9 @@ function verHover() {
   add("div", prod.length ? `${prod.length} produto${prod.length === 1 ? "" : "s"} · ${fmt.format(totalUn(prod))} un` : "Nenhum produto endereçado", "s");
   const ordem = [...prod].sort((a, b) => (state.matched.has(normCod(b.c)) - state.matched.has(normCod(a.c))));
   for (const p of ordem.slice(0, 8)) {
-    const li = add("div", `${p.n || p.c} — ${p.q == null ? "—" : fmt.format(p.q) + " un"}  (${p.loc})`, "li" + (state.matched.has(normCod(p.c)) ? " m" : ""));
+    const mx = p.mx == null ? null : it.mistas[p.mx];
+    const onde = mx ? `${p.loc} · 🗄 ${mx.nome || "caixa mista"}` : p.loc;
+    const li = add("div", `${p.n || p.c} — ${p.q == null ? "—" : fmt.format(p.q) + " un"}  (${onde})`, "li" + (state.matched.has(normCod(p.c)) ? " m" : ""));
   }
   if (prod.length > 8) add("div", `+ ${prod.length - 8} produtos (clique para ver todos)`, "s");
   const h = e.S.h, w = e.it.kind === "gondola" ? D.gondola.r * 2 : e.it.w, d = e.it.kind === "gondola" ? D.gondola.r * 2 : e.it.d;
@@ -626,9 +666,9 @@ function frame(now) {
     if (k >= 1) tween = null; dirty = true;
   }
   if (state.bonecos > 0) { andarBonecos(dt); dirty = true; }
-  for (const s of labels) {
+  for (const s of labels.concat(selosCaixa)) {
     const d = camera.position.distanceTo(s.getWorldPosition(tmpV)), k = THREE.MathUtils.clamp(d * 0.03, 0.6, 1.5) * s.userData.base;
-    s.material.visible = window.__rotulosOn === true;
+    if (s.userData.base === 1) s.material.visible = window.__rotulosOn === true;
     if (Math.abs(s.scale.x - k) > 1e-3) { s.scale.set(k, k / 2.4, 1); dirty = true; }
   }
   if (selGrupo.visible) { selFill.material.opacity = 0.28 + 0.14 * Math.sin(now / 280); dirty = true; }
