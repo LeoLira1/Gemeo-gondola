@@ -484,6 +484,8 @@ def ler_tudo(url: str, token: str) -> dict[str, Any]:
     (anotado em `erros`), sem derrubar os outros."""
     res = consultar(url, token, [SQL_RACKS, SQL_POSICOES, SQL_MESTRE, SQL_MAPA, SQL_MAPA_COD, SQL_ENDERECADO,
                                  SQL_GONDOLAS, SQL_ESTANTES, SQL_QTD_LOJA, SQL_BARRACAO, es.SQL_ESTOCADOS, SQL_ITENS])
+    # Estocado entregue (saldo zerado em materiais_terceiros) sai do mapa já na leitura: baixa automática.
+    res[0], res[11], res[9], baixados = es.tirar_entregues(res[0], res[11], res[9], res[10])
     erros: dict[str, str] = {}
     try:
         galpao = _montar_galpao_de(*res[:6], itens=res[11])
@@ -497,13 +499,13 @@ def ler_tudo(url: str, token: str) -> dict[str, Any]:
         loja["avisos"] = [] if qtd is not None else ["estoque_localizado não pôde ser lida; as quantidades da loja não aparecem."]
     barracao = br.montar(barr)
     return {"galpao": galpao, "loja": loja, "barracao": barracao, "erros": erros,
-            "estocados": estocados_da_cena(terc, galpao, barracao)}
+            "estocados": estocados_da_cena(terc, galpao, barracao), "baixados": baixados}
 
 
 def tudo_exemplo() -> dict[str, Any]:
     galpao, barracao = dados_exemplo(), barracao_exemplo()
     return {"galpao": galpao, "loja": loja_exemplo(), "barracao": barracao, "erros": {},
-            "estocados": estocados_da_cena(_TERCEIROS_DEMO, galpao, barracao)}
+            "estocados": estocados_da_cena(_TERCEIROS_DEMO, galpao, barracao), "baixados": []}
 
 
 # ── Ocupação em porcentagem (indicadores do topo da página) ─────────────────

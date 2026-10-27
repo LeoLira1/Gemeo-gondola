@@ -69,6 +69,10 @@ então **não entra na conta de estoque da loja** (saldo, baixa pela contagem, M
 - **Agrupamento:** linhas do mesmo produto do mesmo cooperado (lotes, notas) viram um item só, com o saldo somado
   (`3 lançamentos`).
 - **Mapa:** paletes de estocado em violeta (`#8B5CF6`).
+- **Baixa automática do entregue:** palete `EST:` cujo item não tem mais saldo em `materiais_terceiros` (o cooperado
+  levou) sai do mapa já na leitura (`estocados.tirar_entregues`): no galpão a pilha desce, no barracão o palete fica
+  livre, e uma linha avisa os endereços. Quem grava a baixa no banco é o Gondolas, ao abrir o galpão ou o barracão.
+  Lista de saldo vazia ou não lida não tira nada.
 - **Somente leitura:** lançar, ajustar e "Retirar do endereço" continuam no app Flutter Gôndolas; este app não escreve
   no banco. Quem um dia escrever aqui deve checar `deve_espelhar(codigo)` antes de gravar em `estoque_localizado`.
 - Se `materiais_terceiros` não puder ser lida, a lista fica vazia e o app avisa; o resto segue.

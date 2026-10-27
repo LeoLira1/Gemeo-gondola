@@ -177,3 +177,71 @@ def para_cena(linhas: list[dict[str, Any]] | None, galpao_racks: Iterable[dict[s
             item["n"] += 1
     itens = list(por_nome.values())
     return {"ok": linhas is not None, "itens": itens, "cor": COR_ESTOCADO}
+
+
+# ── Baixa automática do estocado entregue ────────────────────────────────────
+
+
+def chave_do_palete(nome: str) -> str:
+    """Nome do palete sem acento, sem maiúscula e com espaços normalizados (a mesma chave do Gondolas)."""
+    return " ".join(_normalizar(nome).split())
+
+
+def tirar_entregues(
+    racks: list[dict[str, Any]] | None,
+    itens_rack: list[dict[str, Any]] | None,
+    barracao: list[dict[str, Any]] | None,
+    terceiros: list[dict[str, Any]] | None,
+) -> tuple[list[dict[str, Any]] | None, list[dict[str, Any]] | None, list[dict[str, Any]] | None, list[str]]:
+    """Tira das leituras os paletes "EST:" cujo item já não tem saldo em materiais_terceiros (o cooperado levou).
+
+    O Gondolas grava a baixa (esvazia o endereço); este app só lê, então esconde o palete entregue já na
+    leitura, para o mapa não esperar o Gondolas abrir. No galpão a pilha desce (o N4 vira N3), como no
+    esvaziar do Gondolas, e os produtos extras dos racks mistos acompanham o nível. No barracão o palete
+    fica livre.
+
+    Lista de saldo vazia ou não lida (None) não tira nada: uma leitura ruim não pode sumir com o galpão.
+    Devolve (racks, itens_rack, barracao, endereços baixados).
+    """
+    chaves = {chave_do_palete(i.nome_do_palete) for i in map(item_de_linha, terceiros or []) if i.saldo > 0}
+    if not chaves:
+        return racks, itens_rack, barracao, []
+
+    def entregue(r: dict[str, Any]) -> bool:
+        return codigo_eh_estocado(r.get("produto_codigo")) and chave_do_palete(r.get("produto_nome") or "") not in chaves
+
+    baixados: list[str] = []
+    novos_racks: list[dict[str, Any]] | None = None
+    novos_itens = itens_rack
+    if racks is not None:
+        # Nível novo de cada rack que fica: (posição, ordem antiga) → ordem nova.
+        por_pos: dict[Any, list[dict[str, Any]]] = {}
+        for r in racks:
+            por_pos.setdefault(r.get("posicao"), []).append(r)
+        nova_ordem: dict[tuple[Any, int], int] = {}
+        novos_racks = []
+        for pos, pilha in por_pos.items():
+            n = 0
+            for r in sorted(pilha, key=lambda r: int(r.get("ordem") or 1)):
+                o = int(r.get("ordem") or 1)
+                if entregue(r):
+                    baixados.append(f"Galpão {pos} · N{o}")
+                    continue
+                n += 1
+                nova_ordem[(pos, o)] = n
+                novos_racks.append({**r, "ordem": n})
+        if itens_rack is not None:
+            novos_itens = [
+                {**i, "ordem": nova_ordem[(i.get("posicao"), int(i.get("ordem") or 1))]}
+                for i in itens_rack
+                if (i.get("posicao"), int(i.get("ordem") or 1)) in nova_ordem
+            ]
+    novo_barracao = barracao
+    if barracao is not None:
+        novo_barracao = []
+        for e in barracao:
+            if entregue(e):
+                baixados.append(e.get("rotulo") or "")
+                e = {**e, "produto_codigo": "", "produto_nome": "", "quantidade": 0}
+            novo_barracao.append(e)
+    return novos_racks, novos_itens, novo_barracao, baixados

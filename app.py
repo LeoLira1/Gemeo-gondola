@@ -166,6 +166,9 @@ for aviso in dados.get("avisos", []):
     st.info(aviso)
 if not tudo["estocados"]["ok"] and not motivo:
     st.info("materiais_terceiros não pôde ser lida; a lista de Produtos estocados está vazia.")
+if tudo.get("baixados"):
+    st.caption("📦 Estocado entregue (sem saldo do cooperado), fora do mapa: " + ", ".join(tudo["baixados"])
+               + ". A vaga é liberada no banco quando o Gôndolas abrir o galpão/barracão.")
 
 html_cena = cena_html(dados, mapa, dd.indice_global(tudo["galpao"], tudo["loja"], tudo["barracao"]), tudo["estocados"])
 if hasattr(st, "iframe"):

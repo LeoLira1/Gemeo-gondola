@@ -165,3 +165,47 @@ def test_mesmo_produto_do_mesmo_cooperado_soma_o_saldo():
     assert (b["saldo"], b["n"], b["end"]) == (169, 3, ["Galpão 7 · N1"])  # 40 + 22 + 107, um endereço só
     assert por[("OUTRO", "BORAL 20L")]["saldo"] == 5 and por[("OUTRO", "BORAL 20L")]["end"] == []
     assert por[("BRAVO", "VANTACOR 5L")]["n"] == 1
+
+
+TERC_VANTACOR = {"razao_social": "MARCELO FRANCO PAES LEME", "descricao": "INSETICIDA VANTACOR 1L",
+                 "codigo": "US278180", "saldo": "4"}
+
+
+def _rack(pos, ordem, cod, nome):
+    return {"posicao": pos, "ordem": ordem, "produto_codigo": cod, "produto_nome": nome, "quantidade": 4}
+
+
+def test_estocado_entregue_sai_do_galpao_e_a_pilha_desce():
+    racks = [
+        _rack(43, 1, "111", "ADUBO X"),
+        _rack(43, 2, "EST:US278180", "INSETICIDA VANTACOR 1L · MARCELO FRANCO PAES LEME"),
+        _rack(43, 3, "222", "ADUBO Y"),
+        _rack(40, 1, "EST:254185", "HERBICIDA BORAL 500 SC 20L · JOÃO SILVA"),
+    ]
+    itens = [{"posicao": 43, "ordem": 3, "produto_codigo": "333", "produto_nome": "Z", "quantidade": 1}]
+    novos, novos_itens, _, baixados = es.tirar_entregues(racks, itens, None, LINHAS)  # VANTACOR fora da lista
+    assert baixados == ["Galpão 43 · N2"]
+    assert [(r["posicao"], r["ordem"], r["produto_codigo"]) for r in novos] == [
+        (43, 1, "111"), (43, 2, "222"), (40, 1, "EST:254185")]
+    assert [(i["posicao"], i["ordem"]) for i in novos_itens] == [(43, 2)]  # o misto desceu junto
+
+
+def test_estocado_com_saldo_fica_e_nome_tolera_acento_e_espaco():
+    racks = [_rack(40, 1, "EST:254185", "herbicida boral 500 sc 20l ·  joao silva")]
+    novos, _, _, baixados = es.tirar_entregues(racks, None, None, LINHAS)
+    assert baixados == [] and novos == racks
+
+
+def test_estocado_entregue_libera_o_palete_do_barracao():
+    barr = [{"id": 7, "rotulo": "BAR-07", "produto_codigo": "EST:US278180",
+             "produto_nome": "INSETICIDA VANTACOR 1L · MARCELO FRANCO PAES LEME", "quantidade": 4}]
+    _, _, novo, baixados = es.tirar_entregues(None, None, barr, LINHAS)
+    assert baixados == ["BAR-07"] and novo[0]["produto_codigo"] == "" and novo[0]["quantidade"] == 0
+    _, _, novo, baixados = es.tirar_entregues(None, None, barr, LINHAS + [TERC_VANTACOR])
+    assert baixados == [] and novo == barr
+
+
+def test_lista_vazia_ou_nao_lida_nao_baixa_nada():
+    racks = [_rack(43, 1, "EST:US278180", "INSETICIDA VANTACOR 1L · MARCELO FRANCO PAES LEME")]
+    for terc in (None, [], [{"razao_social": "ZERADO", "descricao": "X", "saldo": "0"}]):
+        assert es.tirar_entregues(racks, None, None, terc)[3] == []
