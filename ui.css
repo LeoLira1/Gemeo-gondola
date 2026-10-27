@@ -60,6 +60,15 @@ html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; c
 #info .lv .l { color: var(--muted); font-weight: 600; white-space: nowrap; font-size: 12px; }
 #info .lv .p { text-align: right; }
 #info .lv.m .p { color: var(--hit); font-weight: 700; }
+#info .cx { border-top: 1px solid var(--line); padding: 6px 0 4px; }
+#info .cxh { display: flex; justify-content: space-between; gap: 10px; font-weight: 700; color: #e87722; font-size: 13px; }
+#info .cxh .l { color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap; }
+#info .cxp { display: flex; align-items: center; gap: 8px; padding: 3px 0 3px 4px; font-size: 13px; }
+#info .cxp i { width: 10px; height: 18px; flex: 0 0 auto; border: 1px solid #2b2a27; border-radius: 2px; }
+#info .cxp .n { flex: 1; min-width: 0; }
+#info .cxp small { display: block; color: var(--muted); font-size: 11px; }
+#info .cxp b { white-space: nowrap; }
+#info .cxp.m .n { color: var(--hit); font-weight: 700; }
 #info .x { position: absolute; right: 10px; top: 8px; cursor: pointer; color: var(--muted); border: 0; background: none; font-size: 20px; line-height: 1; padding: 4px; }
 #tip { position: absolute; display: none; pointer-events: none; z-index: 5; max-width: 330px; padding: 10px 12px;
   background: rgba(35,33,30,.95); color: #fff; border-radius: 12px; font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.28); }

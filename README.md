@@ -14,6 +14,13 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
 - **Rack misto:** o Gondolas deixa até 5 produtos no mesmo palete (o primeiro em `galpao_racks`, os outros em
   `galpao_rack_itens`). Aqui o rack misto ganha duas faixas escuras, o cartão e a dica listam todos os produtos, e a
   busca e a cor de saldo valem para qualquer um deles. Banco sem a tabela nova: o galpão segue só com os racks.
+- **Caixa mista na loja:** o Gondolas deixa até 5 produtos na mesma caixa de estante (madeira, EDR-300 e Estante
+  Parede) — cada produto é uma linha de `estante_layout` no mesmo `(estante_num, coluna, nivel, slot)` e o nome opcional
+  fica em `estante_layout.caixa_nome`. Aqui a caixa daquele slot é desenhada fatiada, de cima para baixo na ordem do
+  app, cada fatia pintada pelo saldo do produto (vermelho falta endereçar, azul acima do sistema, branco fecha; cinza
+  sem saldo), com filete escuro entre elas e o selo laranja `+N`. A busca acende a fatia do produto achado. O cartão
+  agrupa os produtos dela (`🗄 Peças Hoppner · Nível 3 · slot 6 · 3/5`) e a dica marca `🗄`. O saldo é a mesma conta
+  do galpão. A loja lê `SELECT *` de `estante_layout` para não quebrar em banco que ainda não tem a coluna `caixa_nome`.
 - **Loja (gôndolas e estantes):** planta de 10 × 14 m com as 12 gôndolas, estantes de parede, EDR-300,
   expositores MagnoJet/Nellore/Monitor, Estante Parede, balcão e os bonecos que caminham pelos corredores.
   No corredor central, entre a G7 e a G6, a **ilha de paletes**: 12 paletes com tapume verde (2 × 6, numerados de
@@ -24,10 +31,17 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   Encostado no balcão, no vão entre a G9 e a G8, o **Expositor de Madeira**: escada de 3 degraus com 6 produtos em
   cada (estante 24, `nivel` = degrau, 0 = o de baixo); o cartão mostra `Degrau de cima`. O cliente contorna ele pelo
   vão entre as gôndolas.
+  **Caixas nas prateleiras:** cada caixa que o Gondolas coloca (`gondola_layout`, `estante_layout`) aparece na
+  estrutura, na cor gravada (`cor_hex`, por categoria). Gôndola: `andar` + `pos_x`/`pos_z` na escala do mapa, igual ao
+  app. Estantes, Estante Parede, EDR-300 e expositores: o nível escolhe a prateleira e coluna/slot dividem o
+  comprimento (posição proporcional, não a grade exata de cada cena do app). Ilha: 5 caixas por espaço; mostruário:
+  20 posições no tampo. Com busca de produto, as caixas dele acendem em laranja e as outras esmaecem. Botão
+  **📦 Caixas** mostra/esconde.
   Passe o mouse numa estrutura para ver os produtos e quantidades; clique para o cartão completo.
   Busca por estrutura (`G7`, `E5`) e por produto (acende em verde as estruturas que o têm).
 - **Barracão:** a estrutura de 35 × 10 m (paredes de 6 m, porta, portão e porta na parede da frente) com os paletes
-  e bags de `barracao_enderecos` (BAR-01 … BAR-100). Chips por fileira, busca por `BAR7` e por produto, e botão
+  de `barracao_enderecos` (BAR-01 … BAR-100), cada um com a pilha de até 3 gaiolas (o limite do pé-direito) (a do chão em
+  `barracao_enderecos`, as de cima em `barracao_gaiolas`). Chips por fileira, busca por `BAR7` e por produto, e botão
   para alternar paredes reais / em corte. Sem linhas na tabela, mostra o layout padrão do Gondolas, todo livre.
 - **Busca global:** o campo de produto de qualquer mapa procura no galpão, na loja e no barracão. O resumo mostra
   quantos locais há em cada mapa (`Galpão 3 · Loja 2 → · Barracão 1 →`), as setas abrem o outro mapa já com a busca, e a
@@ -42,8 +56,18 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   (0,75 m de altura), com as duas laterais em painel cheio (sem pé de ferro) e painel de fundo, e gaveteiro embaixo do
   tampo (2 gavetas + 1 de pasta) do lado do 119. A frente dá para o corredor da Rua 11. Digite `mesa` no campo Nº para ir até ela. Medidas e
   recuo (0,60 m) estão em `galpao.py`.
+- **Empilhadeira (referência, modelo 3D):** empilhadeira patolada laranja estacionada em frente à mesa de expedição, no
+  corredor da Rua 11 (0,30 m da mesa), paralela a ela, com o timão do lado da frente aberta e o garfo para dentro,
+  antes da rampa. É o modelo
+  `vehicle_forklift_orange_a01` da NVIDIA SimReady convertido para `.glb` (`static/modelos/`, CC BY 4.0, ver
+  `CREDITOS.md`), servido pelo `enableStaticServing` do Streamlit em `app/static/`. Digite `empilhadeira` no campo Nº
+  para ir até as empilhadeiras. Posição e folgas estão em `galpao.py`; para trocar o modelo, `EMPILHADEIRA_MODELO` e as medidas ao lado.
+- **Corredor de carregamento e contrabalançada (referência, modelo 3D):** na frente aberta do Galpão 2, depois da rampa,
+  uma faixa de piso de 5 m no nível de baixo da rampa (0,18 m abaixo do galpão), com a largura da laje. No meio dela, a
+  empilhadeira contrabalançada amarela (`vehicle_forklift_red_c01`, NVIDIA SimReady, 3,74 × 1,36 m; o modelo vem vermelho e a cena pinta a carroceria de amarelo, `CONTRABALANCADA_COR`), paralela à frente
+  e com o garfo para o lado da mesa. Profundidade, queda e posição estão em `galpao.py` (`corredor()`, `contrabalancada()`).
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
-  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (paletes com bag ÷ 100) e Loja
+  Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (gaiolas ÷ 100 paletes × 3) e Loja
   (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do
   galpão mostra a da parte aberta.
 - O Python lê o Turso e injeta só um JSON de dados na cena Three.js; o token

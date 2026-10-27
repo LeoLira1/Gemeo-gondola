@@ -183,7 +183,7 @@ def test_estocado_entregue_sai_do_galpao_e_a_pilha_desce():
         _rack(40, 1, "EST:254185", "HERBICIDA BORAL 500 SC 20L · JOÃO SILVA"),
     ]
     itens = [{"posicao": 43, "ordem": 3, "produto_codigo": "333", "produto_nome": "Z", "quantidade": 1}]
-    novos, novos_itens, _, baixados = es.tirar_entregues(racks, itens, None, LINHAS)  # VANTACOR fora da lista
+    novos, novos_itens, _, _, baixados = es.tirar_entregues(racks, itens, None, LINHAS)  # VANTACOR fora da lista
     assert baixados == ["Galpão 43 · N2"]
     assert [(r["posicao"], r["ordem"], r["produto_codigo"]) for r in novos] == [
         (43, 1, "111"), (43, 2, "222"), (40, 1, "EST:254185")]
@@ -192,20 +192,34 @@ def test_estocado_entregue_sai_do_galpao_e_a_pilha_desce():
 
 def test_estocado_com_saldo_fica_e_nome_tolera_acento_e_espaco():
     racks = [_rack(40, 1, "EST:254185", "herbicida boral 500 sc 20l ·  joao silva")]
-    novos, _, _, baixados = es.tirar_entregues(racks, None, None, LINHAS)
+    novos, _, _, _, baixados = es.tirar_entregues(racks, None, None, LINHAS)
     assert baixados == [] and novos == racks
 
 
 def test_estocado_entregue_libera_o_palete_do_barracao():
     barr = [{"id": 7, "rotulo": "BAR-07", "produto_codigo": "EST:US278180",
              "produto_nome": "INSETICIDA VANTACOR 1L · MARCELO FRANCO PAES LEME", "quantidade": 4}]
-    _, _, novo, baixados = es.tirar_entregues(None, None, barr, LINHAS)
+    _, _, novo, _, baixados = es.tirar_entregues(None, None, barr, LINHAS)
     assert baixados == ["BAR-07"] and novo[0]["produto_codigo"] == "" and novo[0]["quantidade"] == 0
-    _, _, novo, baixados = es.tirar_entregues(None, None, barr, LINHAS + [TERC_VANTACOR])
+    _, _, novo, _, baixados = es.tirar_entregues(None, None, barr, LINHAS + [TERC_VANTACOR])
     assert baixados == [] and novo == barr
 
 
 def test_lista_vazia_ou_nao_lida_nao_baixa_nada():
     racks = [_rack(43, 1, "EST:US278180", "INSETICIDA VANTACOR 1L · MARCELO FRANCO PAES LEME")]
     for terc in (None, [], [{"razao_social": "ZERADO", "descricao": "X", "saldo": "0"}]):
-        assert es.tirar_entregues(racks, None, None, terc)[3] == []
+        assert es.tirar_entregues(racks, None, None, terc)[4] == []
+
+
+def test_gaiola_entregue_sai_da_pilha_do_barracao():
+    barr = [{"id": 7, "rotulo": "BAR-07", "produto_codigo": "111", "produto_nome": "ADUBO X", "quantidade": 1}]
+    gaiolas = [
+        {"endereco_id": 7, "nivel": 2, "produto_codigo": "EST:US278180",
+         "produto_nome": "INSETICIDA VANTACOR 1L · MARCELO FRANCO PAES LEME", "quantidade": 4},
+        {"endereco_id": 7, "nivel": 3, "produto_codigo": "222", "produto_nome": "ADUBO Y", "quantidade": 1},
+    ]
+    _, _, novo_barr, novas, baixados = es.tirar_entregues(None, None, barr, LINHAS, gaiolas)
+    assert baixados == ["BAR-07 · N2"] and novo_barr == barr
+    assert [g["produto_codigo"] for g in novas] == ["222"]
+    pal = br.montar(novo_barr, novas)["pal"][0]
+    assert [(g["nv"], g["c"]) for g in pal["g"]] == [(2, "222")]  # a de cima desceu

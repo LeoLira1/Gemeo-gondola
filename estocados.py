@@ -192,20 +192,23 @@ def tirar_entregues(
     itens_rack: list[dict[str, Any]] | None,
     barracao: list[dict[str, Any]] | None,
     terceiros: list[dict[str, Any]] | None,
-) -> tuple[list[dict[str, Any]] | None, list[dict[str, Any]] | None, list[dict[str, Any]] | None, list[str]]:
+    gaiolas: list[dict[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]] | None, list[dict[str, Any]] | None, list[dict[str, Any]] | None,
+           list[dict[str, Any]] | None, list[str]]:
     """Tira das leituras os paletes "EST:" cujo item já não tem saldo em materiais_terceiros (o cooperado levou).
 
     O Gondolas grava a baixa (esvazia o endereço); este app só lê, então esconde o palete entregue já na
     leitura, para o mapa não esperar o Gondolas abrir. No galpão a pilha desce (o N4 vira N3), como no
-    esvaziar do Gondolas, e os produtos extras dos racks mistos acompanham o nível. No barracão o palete
-    fica livre.
+    esvaziar do Gondolas, e os produtos extras dos racks mistos acompanham o nível. No barracão a gaiola
+    sai da pilha (`gaiolas` = barracao_gaiolas, níveis 2 a 4); o chão entregue fica vazio e o
+    `barracao.montar` desce a de cima para o chão.
 
     Lista de saldo vazia ou não lida (None) não tira nada: uma leitura ruim não pode sumir com o galpão.
-    Devolve (racks, itens_rack, barracao, endereços baixados).
+    Devolve (racks, itens_rack, barracao, gaiolas, endereços baixados).
     """
     chaves = {chave_do_palete(i.nome_do_palete) for i in map(item_de_linha, terceiros or []) if i.saldo > 0}
     if not chaves:
-        return racks, itens_rack, barracao, []
+        return racks, itens_rack, barracao, gaiolas, []
 
     def entregue(r: dict[str, Any]) -> bool:
         return codigo_eh_estocado(r.get("produto_codigo")) and chave_do_palete(r.get("produto_nome") or "") not in chaves
@@ -244,4 +247,13 @@ def tirar_entregues(
                 baixados.append(e.get("rotulo") or "")
                 e = {**e, "produto_codigo": "", "produto_nome": "", "quantidade": 0}
             novo_barracao.append(e)
-    return novos_racks, novos_itens, novo_barracao, baixados
+    novas_gaiolas = gaiolas
+    if gaiolas is not None:
+        rotulo = {e.get("id"): e.get("rotulo") or "" for e in barracao or []}
+        novas_gaiolas = []
+        for gl in gaiolas:
+            if entregue(gl):
+                baixados.append(f"{rotulo.get(gl.get('endereco_id'), '')} · N{int(gl.get('nivel') or 2)}")
+            else:
+                novas_gaiolas.append(gl)
+    return novos_racks, novos_itens, novo_barracao, novas_gaiolas, baixados
