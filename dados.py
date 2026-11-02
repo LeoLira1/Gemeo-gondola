@@ -230,7 +230,9 @@ def montar(
         "escada": g.escada(),
         "lavaolhos": g.lava_olhos(),
         "mesa": g.mesa(),
-        "empilhadeiras": [g.empilhadeira(), g.contrabalancada()],
+        # Empilhadeiras retiradas da cena: os modelos 3D (.glb) travavam o PC da loja. Para voltar:
+        # [g.empilhadeira(), g.contrabalancada()] e o <script> do GLTFLoader em cena.html.
+        "empilhadeiras": [],
         "corredor": g.corredor(),
     }
 

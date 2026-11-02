@@ -56,16 +56,11 @@ de saldo são portadas de `lib/galpao_config.dart`, `lib/galpao_saldo.dart` e
   (0,75 m de altura), com as duas laterais em painel cheio (sem pé de ferro) e painel de fundo, e gaveteiro embaixo do
   tampo (2 gavetas + 1 de pasta) do lado do 119. A frente dá para o corredor da Rua 11. Digite `mesa` no campo Nº para ir até ela. Medidas e
   recuo (0,60 m) estão em `galpao.py`.
-- **Empilhadeira (referência, modelo 3D):** empilhadeira patolada laranja estacionada em frente à mesa de expedição, no
-  corredor da Rua 11 (0,30 m da mesa), paralela a ela, com o timão do lado da frente aberta e o garfo para dentro,
-  antes da rampa. É o modelo
-  `vehicle_forklift_orange_a01` da NVIDIA SimReady convertido para `.glb` (`static/modelos/`, CC BY 4.0, ver
-  `CREDITOS.md`), servido pelo `enableStaticServing` do Streamlit em `app/static/`. Digite `empilhadeira` no campo Nº
-  para ir até as empilhadeiras. Posição e folgas estão em `galpao.py`; para trocar o modelo, `EMPILHADEIRA_MODELO` e as medidas ao lado.
-- **Corredor de carregamento e contrabalançada (referência, modelo 3D):** na frente aberta do Galpão 2, depois da rampa,
-  uma faixa de piso de 5 m no nível de baixo da rampa (0,18 m abaixo do galpão), com a largura da laje. No meio dela, a
-  empilhadeira contrabalançada amarela (`vehicle_forklift_red_c01`, NVIDIA SimReady, 3,74 × 1,36 m; o modelo vem vermelho e a cena pinta a carroceria de amarelo, `CONTRABALANCADA_COR`), paralela à frente
-  e com o garfo para o lado da mesa. Profundidade, queda e posição estão em `galpao.py` (`corredor()`, `contrabalancada()`).
+- **Empilhadeiras: retiradas da cena.** A patolada (em frente à mesa) e a contrabalançada (no corredor de carregamento)
+  travavam o PC da loja no Galpão 2. Os modelos `.glb` continuam em `static/modelos/` e as posições em `galpao.py`
+  (`empilhadeira()`, `contrabalancada()`); para voltar, ver o comentário em `dados.py` (`"empilhadeiras"`).
+- **Corredor de carregamento (referência):** na frente aberta do Galpão 2, depois da rampa, uma faixa de piso de 5 m no
+  nível de baixo da rampa (0,18 m abaixo do galpão), com a largura da laje. Medidas em `galpao.py` (`corredor()`).
 - **Capacidade em %:** quatro indicadores, independentes e cada um em relação às SUAS vagas, em todas as abas:
   Galpão 1 (racks ÷ 85 posições × 4 níveis), Galpão 2 (racks ÷ 53 × 4: 44 nas fileiras + 9 gaiolas), Barracão (gaiolas ÷ 100 paletes × 3) e Loja
   (faixas de endereço com produto ÷ 324: gôndola = 3 andares × 6 faces, estante = um por nível, ilha = um por espaço, mostruário = um por posição). O resumo do canto do
