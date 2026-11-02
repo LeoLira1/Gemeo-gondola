@@ -496,14 +496,12 @@ def test_empilhadeira_em_frente_a_mesa_dentro_do_piso():
                     and e["z0"] < q.z + q.tamanho_z / 2 and e["z1"] > q.z - q.tamanho_z / 2), q.numero
 
 
-def test_empilhadeiras_apontam_para_glb_que_existem():
+def test_empilhadeiras_fora_da_cena():
     from pathlib import Path
+    # retiradas: os modelos 3D travavam o PC da loja
     import dados as ddm
-    emps = ddm.dados_exemplo()["empilhadeiras"]
-    assert [e["nome"] for e in emps] == ["Empilhadeira patolada", "Empilhadeira contrabalançada"]
-    for e in emps:
-        assert e["modelo"].startswith("app/static/")                         # servido pelo enableStaticServing
-        assert (Path(__file__).resolve().parent.parent / e["modelo"].removeprefix("app/")).is_file()
+    assert ddm.dados_exemplo()["empilhadeiras"] == []
+    assert "loaders/GLTFLoader.js" not in (Path(__file__).resolve().parent.parent / "cena.html").read_text(encoding="utf-8")
 
 
 def test_contrabalancada_no_corredor_de_carregamento():
